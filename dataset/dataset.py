@@ -1,0 +1,28 @@
+import torch
+from scipy import sparse
+from torch.utils.data import Dataset
+
+
+class FingerprintDataset(Dataset):
+    def __init__(
+        self,
+        path_steps,
+        path_states
+    ):
+        self.steps = sparse.load_npz(path_steps)
+        self.states = sparse.load_npz(path_states)
+        self.steps = self.steps.tocsr()
+        self.states = self.states.tocsr()
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        state = torch.as_tensor(self.states[idx].toarray())
+        step = torch.as_tensor(self.steps[idx].toarray())
+        # mask = torch.sum(step.bool(), axis=1).bool()
+
+        return state.float(), step.float()
+
+    def __len__(self):
+        return self.states.shape[0]
