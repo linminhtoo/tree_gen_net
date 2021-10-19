@@ -282,6 +282,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_trees", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--max_steps", type=int, default=10)
+    parser.add_argument("--checkpoint_every", type=int, default=25000)
     parser.add_argument("--ncpu", type=int, default=24)
     args = parser.parse_args()
 
@@ -316,6 +317,12 @@ if __name__ == "__main__":
         if tree:
             cnt_success += 1
             trees.append(tree)
+
+            if cnt_success > 0 and cnt_success % args.checkpoint_every == 0:
+                # checkpoint trees
+                with open(args.path_trees, 'wb') as f:
+                    pickle.dump(trees, f)
+
         else:
             cnt_fail += 1
 
