@@ -4,6 +4,10 @@ from torch.utils.data import Dataset
 
 
 class FingerprintDataset(Dataset):
+    '''
+    model agnostic dataset, relies on user to provide correct path_steps & path_states
+    as training data (input & label) for each of the four models is slightly different
+    '''
     def __init__(
         self,
         path_steps,
@@ -18,8 +22,8 @@ class FingerprintDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        state = torch.as_tensor(self.states[idx].toarray())
-        step = torch.as_tensor(self.steps[idx].toarray())
+        state = torch.as_tensor(self.states[idx].toarray()).squeeze(0)
+        step = torch.as_tensor(self.steps[idx].toarray()).squeeze(0)
         # mask = torch.sum(step.bool(), axis=1).bool()
 
         return state.float(), step.float()

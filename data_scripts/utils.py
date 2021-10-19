@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import rdkit.Chem as Chem
 from rdkit.Chem import AllChem, rdChemReactions
@@ -54,7 +55,32 @@ def smi_to_bit_fp(smi, radius=2, fp_size=4096):
 
     return bit_fp # sparse.csr_matrix(bit_fp, dtype="int32")
 
+def knn_search(query, index, k=1):
+    '''
+    Args
+        query: a single np array or torch tensor (ie size (1, 256))
+        index: nmslib FloatIndex
+        k: number of nearest neighbors to return
+    Returns
+        idxs: indices of nearest neighbors, starting with the nearest one
+        dists: distances in metric of search index (default: cosine-similarity)
+    '''
+    idxs, dists = index.knnQuery(query, k=k)
+    return idxs, dists
 
+def knn_search_batch(query_batch, index, k=1):
+    '''
+    Args
+        query_batch: a batch np array or torch tensor (eg size (32, 256))
+        index: nmslib FloatIndex
+        k: number of nearest neighbors to return
+    Returns
+        idxs: indices of nearest neighbors, starting with the nearest one
+        dists: distances in metric of search index (default: cosine-similarity)
+    '''
+    rst = index.knnQueryBatch(query_batch, k=k)
+    idxs, dists = zip(*rst)
+    return idxs, dists
 
 def seed_everything(seed):
     import random, os
@@ -68,3 +94,15 @@ def seed_everything(seed):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
+
+def numel(m: torch.nn.Module, only_trainable: bool = False):
+    """
+    returns the total number of parameters used by `m` (only counting
+    shared parameters once); if `only_trainable` is True, then only
+    includes parameters with `requires_grad = True`
+    """
+    parameters = list(m.parameters())
+    if only_trainable:
+        parameters = [p for p in parameters if p.requires_grad]
+    unique = {p.data_ptr(): p for p in parameters}.values()
+    return sum(p.numel() for p in unique)

@@ -181,9 +181,13 @@ if __name__ == "__main__":
 
     # make into sparse matrix
     # csc matrix for fast column slicing operations
-    # (we need to select appropriate columns as input & groundtruth data depending on network)
+    # (later, we will select appropriate columns as input & groundtruth data depending on network)
     states_sparse = sparse.csc_matrix(states_all)
     steps_sparse = sparse.csc_matrix(steps_all)
+
+    (args.path_states.parent).mkdir(parents=True, exist_ok=True)
+    (args.path_steps.parent).mkdir(parents=True, exist_ok=True)
+
     sparse.save_npz(args.path_states, states_sparse)
     sparse.save_npz(args.path_steps, steps_sparse)
 
