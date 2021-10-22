@@ -171,7 +171,7 @@ def gen_synth_tree(smis, template_strs,
                 # if merge, the reaction must fit both sub-tree root molecules
                 # thus, reaction mask has to be specially calculated
                 mask_rxn = get_mask_reaction_merge(state, template_strs)
-            else: # if not merge, reaction just has to fit rct1_smi, we can smaple rct2_smi later
+            else: # if not merge, reaction just has to fit rct1_smi, we can sample rct2_smi later
                 mask_rxn, rct1_temps, rct2_temps = get_mask_rxn_and_order(rct1_smi,
                                                                         template_strs,
                                                                         rct_to_temps)
@@ -218,7 +218,7 @@ def gen_synth_tree(smis, template_strs,
                     rct2_idx = int(torch.argmax(probs_rct2_masked).item())
                     rct2_smi = smis[rct2_idx]
 
-                # run the bi-molecular reaction, TODO: may need try except here
+                # run the bi-molecular reaction
                 rct1_mol = Chem.MolFromSmiles(rct1_smi)
                 rct2_mol = Chem.MolFromSmiles(rct2_smi)
 
@@ -239,7 +239,7 @@ def gen_synth_tree(smis, template_strs,
             # update the tree
             tree.execute_action(
                 action, rxn_str, rct1_smi, rct2_smi, prod_smi
-                    )
+            )
             most_recent_mol_smi = prod_smi
     except Exception as e:
         # something wrong happened

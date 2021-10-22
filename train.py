@@ -214,7 +214,8 @@ def train(args):
         if args.early_stop and max_val_acc - val_accs[-1] > 0:
             if args.early_stop_patience <= wait:
                 message = f"\nEarly stopped at the end of epoch: {epoch}, \
-                \nval loss: {val_losses[-1]:.4f}, val top-1 acc: {val_accs[-1]:.4f}\n"
+                \nval loss: {val_losses[-1]:.4f}, val top-1 acc: {val_accs[-1]:.4f} \
+                \nbest val top-1 acc: {max_val_acc:.4f}\n"
                 print(message)
                 break
             else:
@@ -226,7 +227,8 @@ def train(args):
 
         message = f"\nEnd of epoch: {epoch}, \
                 \ntrain loss: {train_losses[-1]:.4f}, train top-1 acc: {train_accs[-1]:.4f}, \
-                \nval loss: {val_losses[-1]:.4f}, val top-1 acc: {val_accs[-1]:.4f}\n"
+                \nval loss: {val_losses[-1]:.4f}, val top-1 acc: {val_accs[-1]:.4f} \
+                \nbest val top-1 acc: {max_val_acc:.4f}\n"
         print(message)
 
     # save last checkpoint
@@ -267,11 +269,12 @@ if __name__ == '__main__':
     parser.add_argument("--checkpoint_existok", action="store_true", help="whether to override existing checkpoint")
     parser.add_argument("--epochs", type=int, default=100, help="number of training epochs")
     parser.add_argument("--early_stop", action="store_true", help="whether to early stop")
-    parser.add_argument("--logging", action="store_true", help="whether logging to disk (disables tqdm")
+    parser.add_argument("--logging", action="store_true", help="whether logging to disk (disables tqdm)")
     parser.add_argument("--early_stop_patience", type=int, default=10, help="early stop patience (number of epochs)")
     parser.add_argument("--seed", type=int, default=1337, help="random seed")
     parser.add_argument("--optim", type=str, default="Adam", help="optimizer")
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
     args = parser.parse_args()
 
+    print(args)
     train(args)
