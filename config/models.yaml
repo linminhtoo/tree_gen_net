@@ -1,0 +1,24 @@
+input_fp_dim: 4096
+output_fp_dim: 256
+radius: 2
+num_templates: 89
+
+f_act:
+    path_ckpt: "checkpoints/maxstep10_num100k_f_act_v1/best.pth.tar"
+    hidden_sizes: [1000, 1200, 3000, 3000]
+    dropout: 0.25
+
+f_rt1:
+    path_ckpt: "checkpoints/maxstep10_num100k_f_rt1_v1/best.pth.tar"
+    hidden_sizes: [1000, 1200, 3000, 3000]
+    dropout: 0.25
+
+f_rt2:
+    path_ckpt: "checkpoints/maxstep10_num100k_f_rt2_v1/best.pth.tar"
+    hidden_sizes: [1000, 1200, 3000, 3000]
+    dropout: 0.25
+
+f_rxn:
+    path_ckpt: "checkpoints/maxstep10_num100k_f_rxn_v1/best.pth.tar"
+    hidden_sizes: [1000, 1200, 3000, 3000]
+    dropout: 0.25

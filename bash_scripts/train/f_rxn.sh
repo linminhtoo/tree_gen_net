@@ -4,7 +4,8 @@ conda activate tree
 # change these
 # choose from "f_rt1", "f_rt2", "f_rxn", "f_act"
 model="f_rxn"
-tree_prefix="maxstep10_num100k"
+# tree_prefix="maxstep10_num100k"
+tree_prefix="maxstep15_num600k"
 version="v1"
 
 # f_act --> tested, working, trains (loss converges)

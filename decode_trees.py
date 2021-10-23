@@ -2,15 +2,22 @@ import argparse
 import os
 import pickle
 import sys
-from multiprocessing import Pool
+# from multiprocessing import Pool
+from torch.multiprocessing import Pool, set_start_method
+try:
+    set_start_method('spawn')
+except RuntimeError:
+    pass
 from pathlib import Path
 
+import yaml
 import nmslib
 import pandas as pd
 import torch
 from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem, rdChemReactions
 from tqdm import tqdm
+from scipy import sparse
 
 package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(package_dir)
@@ -20,6 +27,7 @@ from data_scripts.build_random_trees import (get_mask_action, get_mask_rct2,
 from data_scripts.synthesis_tree import SynthesisTree
 from data_scripts.build_knn_index import create_knn_index
 from data_scripts.utils import knn_search, smi_to_bit_fp
+from model.basic import BasicFeedforward
 
 # silence annoying RDKit logging
 lg = RDLogger.logger()
@@ -55,7 +63,7 @@ def embed_state(state, dim=4096, radius=2):
 def decode_synth_tree(
         f_act, f_rt1, f_rt2, f_rxn,
         target_smi,
-        index_all_mols, mol_fps, smis,
+        mol_fps, smis, index_all_mols,
         template_strs, temp_to_rcts, rct_to_temps,
         input_dim=4096, radius=2,
         t_max=10
@@ -74,7 +82,7 @@ def decode_synth_tree(
     z_target = z_target.to(device)
 
     try:
-        for t in tqdm(range(t_max)):
+        for t in range(t_max):
             state = tree.eval_state()
 
             z_state = embed_state(state, dim=input_dim, radius=radius)
@@ -188,8 +196,8 @@ def decode_synth_tree(
             most_recent_mol_smi = prod_smi
     except Exception as e:
         # something wrong happened
-        # print(e)
-        raise e
+        print(e)
+        # raise e
         action = -1
         tree = None
 
@@ -208,3 +216,173 @@ def decode_synth_tree(
         # something wrong happened
         # print('error')
         return None
+
+def load_models(config):
+    if torch.cuda.is_available():
+        print('GPU is available')
+        cuda_available = True
+    else:
+        print('no GPU')
+        cuda_available = False
+
+    # action selection network
+    f_act = BasicFeedforward(
+        input_size=config['input_fp_dim'] * 3,
+        act_fn="ReLU",
+        hidden_sizes=config['f_act']['hidden_sizes'],
+        output_size=4,
+        dropout=config['f_act']['dropout'],
+        final_act_fn="softmax"
+    )
+    f_act_ckpt = torch.load(config['f_act']['path_ckpt'])
+    f_act.load_state_dict(f_act_ckpt['state_dict'])
+    f_act = f_act.eval()
+    if cuda_available:
+        f_act = f_act.cuda()
+
+    # reactant1 prediction network
+    f_rt1 = BasicFeedforward(
+        input_size=config['input_fp_dim'] * 3,
+        act_fn="ReLU",
+        hidden_sizes=config['f_rt1']['hidden_sizes'],
+        output_size=config['output_fp_dim'],
+        dropout=config['f_rt1']['dropout'],
+        final_act_fn=None # linear activation
+    )
+    f_rt1_ckpt = torch.load(config['f_rt1']['path_ckpt'])
+    f_rt1.load_state_dict(f_rt1_ckpt['state_dict'])
+    f_rt1 = f_rt1.eval()
+    if cuda_available:
+        f_rt1 = f_rt1.cuda()
+
+    # reaction selection network
+    f_rxn = BasicFeedforward(
+        input_size=config['input_fp_dim'] * 4,
+        act_fn="ReLU",
+        hidden_sizes=config['f_rxn']['hidden_sizes'],
+        output_size=config['num_templates'],
+        dropout=config['f_rxn']['dropout'],
+        final_act_fn="softmax" # linear activation
+    )
+    f_rxn_ckpt = torch.load(config['f_rxn']['path_ckpt'])
+    f_rxn.load_state_dict(f_rxn_ckpt['state_dict'])
+    f_rxn = f_rxn.eval()
+    if cuda_available:
+        f_rxn = f_rxn.cuda()
+
+    # reactant2 prediction network
+    f_rt2 = BasicFeedforward(
+        input_size=config['input_fp_dim'] * 4 + config['num_templates'],
+        act_fn="ReLU",
+        hidden_sizes=config['f_rt2']['hidden_sizes'],
+        output_size=config['output_fp_dim'],
+        dropout=config['f_rt2']['dropout'],
+        final_act_fn=None # linear activation
+    )
+    f_rt2_ckpt = torch.load(config['f_rt2']['path_ckpt'])
+    f_rt2.load_state_dict(f_rt2_ckpt['state_dict'])
+    f_rt2 = f_rt2.eval()
+    if cuda_available:
+        f_rt2 = f_rt2.cuda()
+
+    return f_act, f_rt1, f_rt2, f_rxn
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv")
+    parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
+    parser.add_argument("--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle")
+    parser.add_argument("--path_temp_to_rcts", type=Path, default="data/temp_to_rcts_cleaned.pickle")
+    parser.add_argument("--path_fps", type=Path, default="data/rct_fps.npz")
+    parser.add_argument("--path_index", type=Path, default="data/knn_rct_fps.index")
+    parser.add_argument("--path_target_smis", type=Path, default="data/split/trees_test.pickle",
+                        help="path to .csv or .txt containing list of SMILES or .pickle containing trees")
+    parser.add_argument("--path_model_config", type=Path, default="config/models.yaml")
+    parser.add_argument("--path_save_decoded_trees", type=Path, default="data/decoded_trees.pickle")
+    parser.add_argument("--max_steps", type=int, default=10)
+    parser.add_argument("--checkpoint_every", type=int, default=25000)
+    args = parser.parse_args()
+
+    # load valid building blocks
+    df_matched = pd.read_csv(args.path_csv_matched_rcts)
+    smis = df_matched.SMILES.tolist()
+
+    # load templates
+    with open(args.path_templates, 'r') as f:
+        template_strs = [l.strip().split('|')[1] for l in f.readlines()]
+
+    # NOTE: this has limited utility, once we start making new molecules, this dict cannot be used
+    with open(args.path_rct_to_temps, 'rb') as f:
+        rct_to_temps = pickle.load(f)
+
+    with open(args.path_temp_to_rcts, 'rb') as f:
+        temp_to_rcts = pickle.load(f)
+
+    # load building block embeddings (fingerprints)
+    mol_fps = sparse.load_npz(args.path_fps)
+    mol_fps = mol_fps.toarray()
+
+    # load building block kNN search index
+    index_all_mols = nmslib.init(method='hnsw', space='cosinesimil')
+    index_all_mols.loadIndex(str(args.path_index), load_data=True)
+
+    # load the target product SMILES - can be a list of SMILES (.csv/.txt) or tree (.pickle)
+    target_ext = args.path_target_smis.name.split('.')[-1]
+    if target_ext == "pickle":
+        # target_smi are in trees
+        with open(args.path_target_smis, 'rb') as f:
+            target_trees = pickle.load(f)
+        target_smis = [tree.molecules[-1].smi for tree in target_trees]
+    elif target_ext == "txt":
+        # target_smi are in text file
+        with open(args.path_target_smis, 'r') as f:
+            target_smis = [l.strip() for l in f.readlines()]
+    elif target_ext == "csv":
+        # target_smi are in dataframe
+        df_target = pd.read_csv(args.path_target_smis)
+        target_smis = df_target.SMILES.tolist()
+    else:
+        raise ValueError(f"unrecognized extension of --path_target_smis: {target_ext}")
+
+    with open(args.path_model_config, "r") as stream:
+        model_config = yaml.safe_load(stream)
+
+    # load 4 trained models from checkpoints
+    f_act, f_rt1, f_rt2, f_rxn = load_models(model_config)
+    f_act.share_memory()
+    f_rt1.share_memory()
+    f_rt2.share_memory()
+    f_rxn.share_memory()
+    print(f"finished loading 4 models from checkpoints")
+
+    # run the decoding on single process
+    trees = []
+    cnt_success, cnt_fail = 0, 0
+    for target_smi in tqdm(target_smis):
+        tree = decode_synth_tree(
+                f_act=f_act, f_rt1=f_rt1, f_rt2=f_rt2, f_rxn=f_rxn,
+                target_smi=target_smi,
+                mol_fps=mol_fps, smis=smis, index_all_mols=index_all_mols,
+                template_strs=template_strs, temp_to_rcts=temp_to_rcts, rct_to_temps=rct_to_temps,
+                input_dim=model_config['input_fp_dim'], radius=model_config['radius'],
+                t_max=args.max_steps
+            )
+        if tree:
+            cnt_success += 1
+            trees.append(tree)
+
+            if cnt_success > 0 and cnt_success % args.checkpoint_every == 0:
+                # checkpoint trees
+                with open(args.path_trees, 'wb') as f:
+                    pickle.dump(trees, f)
+
+        else:
+            cnt_fail += 1
+
+    print(f"num targets: {len(target_smis)}")
+    print(f"num success: {cnt_success} ({cnt_success / len(target_smis) * 100:.2f}%)")
+    print(f"num fail: {cnt_fail} ({cnt_fail / len(target_smis) * 100:.2f}%)")
+
+    # save decoded trees for evaluation & metric calculation
+    with open(args.path_save_decoded_trees, 'wb') as f:
+        pickle.dump(trees, f)

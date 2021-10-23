@@ -2,7 +2,8 @@ source ~/.bashrc
 conda activate tree
 
 # change this
-tree_prefix="maxstep10_num100k"
+# tree_prefix="maxstep10_num100k"
+tree_prefix="maxstep15_num600k"
 
 declare -a phases=("train" "val" "test")
 
@@ -14,6 +15,8 @@ for phase in "${phases[@]}"; do
         --path_steps "data/${phase}/steps_${tree_prefix}.npz" \
         --path_states "data/${phase}/states_${tree_prefix}.npz"
 done
+
+# with tree_prefix="maxstep10_num100k"
 # processing train
 # saved X f_act: data/train/states_maxstep10_num100k_f_act.npz --> length: 56979
 # saved y f_act: data/train/steps_maxstep10_num100k_f_act.npz --> length: 56979

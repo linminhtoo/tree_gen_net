@@ -2,7 +2,8 @@ source ~/.bashrc
 conda activate tree
 
 # change this
-tree_prefix="maxstep10_num100k"
+# tree_prefix="maxstep10_num100k"
+tree_prefix="maxstep15_num600k"
 
 declare -a phases=("train" "val" "test")
 
