@@ -178,6 +178,8 @@ if __name__ == "__main__":
             # from debugging, seems that they are very complex molecules
             error_cnt += 1
     print(f'error_cnt: {error_cnt}')
+    print(f'length of states: {len(states_all)}')
+    print(f'length of steps: {len(steps_all)}')
 
     # make into sparse matrix
     # csc matrix for fast column slicing operations
@@ -189,7 +191,6 @@ if __name__ == "__main__":
     (args.path_steps.parent).mkdir(parents=True, exist_ok=True)
 
     sparse.save_npz(args.path_states, states_sparse)
+    print('saved states')
     sparse.save_npz(args.path_steps, steps_sparse)
-
-    print(f'length of states: {states_sparse.shape[0]}')
-    print(f'length of steps: {steps_sparse.shape[0]}')
+    print('saved steps')

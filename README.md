@@ -6,3 +6,5 @@
     - property optimization: genetic algorithm --> decode --> metrics
 - citation & brief description of paper
 - potential next steps
+    - research ideas, if any
+    - unit tests

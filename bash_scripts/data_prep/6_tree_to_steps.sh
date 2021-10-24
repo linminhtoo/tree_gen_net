@@ -4,6 +4,7 @@ conda activate tree
 # change this
 # tree_prefix="maxstep10_num100k"
 tree_prefix="maxstep15_num600k"
+# around 8 mins for 140k trees
 
 declare -a phases=("train" "val" "test")
 

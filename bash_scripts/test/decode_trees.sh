@@ -10,4 +10,7 @@ CUDA_VISIBLE_DEVICES=3 python3 decode_trees.py \
     # --ncpu 8
 # multiprocessing is too slow, about 2.2 sec/tree even on 8 processes
 # not able to init models in initializer, CUDA OOM
-# single process --> ~1-1.5s/tree
+# █████████████| 8005/8005 [4:49:19<00:00,  2.17s/it]
+# num targets: 8005
+# num success: 7598 (94.92%)
+# num fail: 407 (5.08%)

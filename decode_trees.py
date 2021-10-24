@@ -2,30 +2,24 @@ import argparse
 import os
 import pickle
 import sys
-# from multiprocessing import Pool
-from torch.multiprocessing import Pool, set_start_method
-try:
-    set_start_method('spawn')
-except RuntimeError:
-    pass
 from pathlib import Path
 
-import yaml
 import nmslib
 import pandas as pd
 import torch
+import yaml
 from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem, rdChemReactions
-from tqdm import tqdm
 from scipy import sparse
+from tqdm import tqdm
 
 package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(package_dir)
+from data_scripts.build_knn_index import create_knn_index
 from data_scripts.build_random_trees import (get_mask_action, get_mask_rct2,
                                              get_mask_reaction_merge,
                                              get_mask_rxn_and_order)
 from data_scripts.synthesis_tree import SynthesisTree
-from data_scripts.build_knn_index import create_knn_index
 from data_scripts.utils import knn_search, smi_to_bit_fp
 from model.basic import BasicFeedforward
 
@@ -62,7 +56,7 @@ def embed_state(state, dim=4096, radius=2):
 
 def decode_synth_tree(
         f_act, f_rt1, f_rt2, f_rxn,
-        target_smi,
+        target_smi, target_z,
         mol_fps, smis, index_all_mols,
         template_strs, temp_to_rcts, rct_to_temps,
         input_dim=4096, radius=2,
@@ -76,9 +70,14 @@ def decode_synth_tree(
     # assume all parameters of f_act are on same device
     device = next(f_act.parameters()).device
 
-    z_target = torch.from_numpy(
-        smi_to_bit_fp(target_smi, fp_size=input_dim, radius=radius)
-    ).unsqueeze(0)
+    if target_smi:
+        z_target = torch.from_numpy(
+            smi_to_bit_fp(target_smi, fp_size=input_dim, radius=radius)
+        ).unsqueeze(0)
+    elif target_z:
+        z_target = torch.from_numpy(target_z).unsqueeze(0)
+    else:
+        raise ValueError("either target_smi or target_z must be provided")
     z_target = z_target.to(device)
 
     try:
@@ -349,10 +348,6 @@ if __name__ == "__main__":
 
     # load 4 trained models from checkpoints
     f_act, f_rt1, f_rt2, f_rxn = load_models(model_config)
-    f_act.share_memory()
-    f_rt1.share_memory()
-    f_rt2.share_memory()
-    f_rxn.share_memory()
     print(f"finished loading 4 models from checkpoints")
 
     # run the decoding on single process
@@ -361,7 +356,7 @@ if __name__ == "__main__":
     for target_smi in tqdm(target_smis):
         tree = decode_synth_tree(
                 f_act=f_act, f_rt1=f_rt1, f_rt2=f_rt2, f_rxn=f_rxn,
-                target_smi=target_smi,
+                target_smi=target_smi, target_z=None,
                 mol_fps=mol_fps, smis=smis, index_all_mols=index_all_mols,
                 template_strs=template_strs, temp_to_rcts=temp_to_rcts, rct_to_temps=rct_to_temps,
                 input_dim=model_config['input_fp_dim'], radius=model_config['radius'],
@@ -373,7 +368,7 @@ if __name__ == "__main__":
 
             if cnt_success > 0 and cnt_success % args.checkpoint_every == 0:
                 # checkpoint trees
-                with open(args.path_trees, 'wb') as f:
+                with open(args.path_save_decoded_trees, 'wb') as f:
                     pickle.dump(trees, f)
 
         else:
