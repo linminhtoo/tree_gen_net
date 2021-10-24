@@ -55,6 +55,16 @@ def smi_to_bit_fp(smi, radius=2, fp_size=4096):
 
     return bit_fp # sparse.csr_matrix(bit_fp, dtype="int32")
 
+def smi_to_bit_fp_raw(smi, radius=2, fp_size=4096):
+    mol = Chem.MolFromSmiles(smi)
+
+    fp_gen = GetMorganGenerator(
+        radius=radius, useCountSimulation=False,
+        includeChirality=False, fpSize=fp_size
+    )
+    uint_bit_fp = fp_gen.GetFingerprint(mol)
+    return uint_bit_fp
+
 def knn_search(query, index, k=1):
     '''
     Args

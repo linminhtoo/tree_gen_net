@@ -10,28 +10,19 @@ multiprocessing.set_start_method('spawn', force=True)
 
 import nmslib
 import pandas as pd
-import torch
 import yaml
-from rdkit import Chem, RDLogger
-from rdkit.Chem import AllChem, rdChemReactions
+from rdkit import RDLogger
 from scipy import sparse
 from tqdm import tqdm
 
 package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(package_dir)
-from data_scripts.build_knn_index import create_knn_index
-from data_scripts.build_random_trees import (get_mask_action, get_mask_rct2,
-                                             get_mask_reaction_merge,
-                                             get_mask_rxn_and_order)
-from data_scripts.synthesis_tree import SynthesisTree
-from data_scripts.utils import knn_search, smi_to_bit_fp
-from model.basic import BasicFeedforward
 
 # silence annoying RDKit logging
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
-from decode_trees import load_models, embed_state, decode_synth_tree
+from decode_trees import load_models, decode_synth_tree
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv")
