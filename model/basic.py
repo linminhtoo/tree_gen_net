@@ -5,6 +5,7 @@ import torch.nn as nn
 
 Tensor = torch.Tensor
 
+
 class BasicFeedforward(nn.Module):
     """
     implements a basic feedforward network
@@ -17,23 +18,22 @@ class BasicFeedforward(nn.Module):
         how many outputs the model should give
     """
 
-    def __init__(self,
-            input_size=4096,
-            act_fn="ReLU",
-            hidden_sizes=[1000, 1200, 3000, 3000],
-            output_size=256,
-            dropout=0,
-            final_act_fn=None
-        ):
+    def __init__(
+        self,
+        input_size=4096,
+        act_fn="ReLU",
+        hidden_sizes=[1000, 1200, 3000, 3000],
+        output_size=256,
+        dropout=0,
+        final_act_fn=None,
+    ):
         super().__init__()
 
         self.encoder = self.build(
-            input_size, hidden_sizes, act_fn, dropout,
-            is_last=False
+            input_size, hidden_sizes, act_fn, dropout, is_last=False
         )
         self.output = self.build(
-            hidden_sizes[-1], [output_size], None, None,
-            is_last=True
+            hidden_sizes[-1], [output_size], None, None, is_last=True
         )
         if final_act_fn:
             if final_act_fn == "softmax":
@@ -44,14 +44,7 @@ class BasicFeedforward(nn.Module):
         else:
             self.final_act_fn = None
 
-    def build(
-        self,
-        input_size,
-        hidden_sizes,
-        act_fn,
-        dropout,
-        is_last=False
-    ):
+    def build(self, input_size, hidden_sizes, act_fn, dropout, is_last=False):
         if act_fn:
             if act_fn == "ReLU":
                 act = nn.ReLU()
@@ -61,22 +54,20 @@ class BasicFeedforward(nn.Module):
         num_layers = len(hidden_sizes)
 
         if is_last:
-            block = [
-                    nn.Linear(input_size, hidden_sizes[0])
-                ]
+            block = [nn.Linear(input_size, hidden_sizes[0])]
         else:
             block = [
-                    nn.Linear(input_size, hidden_sizes[0]),
-                    nn.BatchNorm1d(num_features=hidden_sizes[0]),
-                    act
-                ]
+                nn.Linear(input_size, hidden_sizes[0]),
+                nn.BatchNorm1d(num_features=hidden_sizes[0]),
+                act,
+            ]
             for i in range(num_layers - 1):
                 block.extend(
                     [
                         nn.Dropout(dropout),
                         nn.Linear(hidden_sizes[i], hidden_sizes[i + 1]),
                         nn.BatchNorm1d(num_features=hidden_sizes[i + 1]),
-                        act
+                        act,
                     ]
                 )
         return nn.Sequential(*block)
@@ -93,17 +84,20 @@ class BasicFeedforward(nn.Module):
         else:
             return output
 
+
 if __name__ == "__main__":
     import argparse
     from pathlib import Path
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
+    parser.add_argument(
+        "--path_templates", type=Path, default="data/templates_cleaned.txt"
+    )
     args = parser.parse_args()
 
     # load templates
-    with open(args.path_templates, 'r') as f:
-        template_strs = [l.strip().split('|')[1] for l in f.readlines()]
+    with open(args.path_templates, "r") as f:
+        template_strs = [l.strip().split("|")[1] for l in f.readlines()]
 
     # action selection network
     f_act = BasicFeedforward(
@@ -112,12 +106,12 @@ if __name__ == "__main__":
         hidden_sizes=[1000, 1200, 3000, 3000],
         output_size=4,
         dropout=0,
-        final_act_fn="softmax"
+        final_act_fn="softmax",
     )
     sample_batch = torch.randn((32, 4096 * 3))
     sample_out = f_act(sample_batch)
-    print(f'output shape from f_act: {sample_out.shape}')
-    print(f'sample row: {sample_out[0]}')
+    print(f"output shape from f_act: {sample_out.shape}")
+    print(f"sample row: {sample_out[0]}")
 
     # reactant1 prediction network
     f_rt1 = BasicFeedforward(
@@ -126,12 +120,12 @@ if __name__ == "__main__":
         hidden_sizes=[1000, 1200, 3000, 3000],
         output_size=256,
         dropout=0,
-        final_act_fn=None # linear activation
+        final_act_fn=None,  # linear activation
     )
     sample_batch = torch.randn((32, 4096 * 3))
     sample_out = f_rt1(sample_batch)
-    print(f'output shape from f_rt1: {sample_out.shape}')
-    print(f'sample row: {sample_out[0]}')
+    print(f"output shape from f_rt1: {sample_out.shape}")
+    print(f"sample row: {sample_out[0]}")
 
     # reaction selection network
     f_rxn = BasicFeedforward(
@@ -140,12 +134,12 @@ if __name__ == "__main__":
         hidden_sizes=[1000, 1200, 3000, 3000],
         output_size=len(template_strs),
         dropout=0,
-        final_act_fn="softmax"
+        final_act_fn="softmax",
     )
     sample_batch = torch.randn((32, 4096 * 4))
     sample_out = f_rxn(sample_batch)
-    print(f'output shape from f_rxn: {sample_out.shape}')
-    print(f'sample row: {sample_out[0]}')
+    print(f"output shape from f_rxn: {sample_out.shape}")
+    print(f"sample row: {sample_out[0]}")
 
     # reactant2 prediciton network
     f_rt2 = BasicFeedforward(
@@ -154,9 +148,9 @@ if __name__ == "__main__":
         hidden_sizes=[1000, 1200, 3000, 3000],
         output_size=256,
         dropout=0,
-        final_act_fn=None # linear activation
+        final_act_fn=None,  # linear activation
     )
     sample_batch = torch.randn((32, 4096 * 4 + len(template_strs)))
     sample_out = f_rt2(sample_batch)
-    print(f'output shape from f_rt2: {sample_out.shape}')
-    print(f'sample row: {sample_out[0]}')
+    print(f"output shape from f_rt2: {sample_out.shape}")
+    print(f"sample row: {sample_out[0]}")

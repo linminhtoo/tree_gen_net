@@ -4,15 +4,12 @@ from torch.utils.data import Dataset
 
 
 class FingerprintDataset(Dataset):
-    '''
+    """
     model agnostic dataset, relies on user to provide correct path_steps & path_states
     as training data (input & label) for each of the four models is slightly different
-    '''
-    def __init__(
-        self,
-        path_steps,
-        path_states
-    ):
+    """
+
+    def __init__(self, path_steps, path_states):
         self.steps = sparse.load_npz(path_steps)
         self.states = sparse.load_npz(path_states)
         self.steps = self.steps.tocsr()

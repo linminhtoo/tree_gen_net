@@ -19,7 +19,9 @@ lg.setLevel(RDLogger.CRITICAL)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv")
+    parser.add_argument(
+        "--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv"
+    )
     parser.add_argument("--path_fps", type=Path, default="data/rct_fps.npz")
     parser.add_argument("--output_dim", type=int, default=256)
     parser.add_argument("--output_radius", type=int, default=2)
@@ -31,7 +33,9 @@ if __name__ == "__main__":
 
     bit_fps = []
     for rct_smi in tqdm(rct_smis):
-        bit_fp = smi_to_bit_fp(rct_smi, radius=args.output_radius, fp_size=args.output_dim)
+        bit_fp = smi_to_bit_fp(
+            rct_smi, radius=args.output_radius, fp_size=args.output_dim
+        )
         bit_fp = sparse.csr_matrix(bit_fp, dtype="int32")
         bit_fps.append(bit_fp)
 

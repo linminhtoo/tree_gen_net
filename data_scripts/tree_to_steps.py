@@ -47,9 +47,9 @@ def tree_to_steps(tree, rxn2idx, rct2idx, template_strs, in_dim, out_dim):
             if action == 0:
                 rct1_idx = rct2idx[rct1_smi]
             else:
-                rct1_idx = -1 # mask out
+                rct1_idx = -1  # mask out
 
-            if rxn_node.right: # bi-molecular reaction
+            if rxn_node.right:  # bi-molecular reaction
                 rct2_node = rxn_node.right
                 rct2_smi = rct2_node.smi
                 a_rt2 = embed_output(rct2_smi)
@@ -61,13 +61,13 @@ def tree_to_steps(tree, rxn2idx, rct2idx, template_strs, in_dim, out_dim):
                 if action == 0 or action == 1:
                     rct2_idx = rct2idx[rct2_smi]
                 else:
-                    rct2_idx = -1 # mask out
+                    rct2_idx = -1  # mask out
 
             else:
                 a_rt2 = np.zeros(out_dim)
-                rct2_idx = -1 # mask out
+                rct2_idx = -1  # mask out
 
-        else: # need to predict "END", only has valid data for f_act
+        else:  # need to predict "END", only has valid data for f_act
             # so, when training the other networks, need to mask out X's which are all 0's
             a_rt1 = np.zeros(out_dim)
             z_rt1 = np.zeros(in_dim)
@@ -80,14 +80,10 @@ def tree_to_steps(tree, rxn2idx, rct2idx, template_strs, in_dim, out_dim):
         else:
             # use tree_state to retrieve smi and then embed into z_state
             if len(tree_state) == 1:
-                z_state = np.hstack(
-                    (embed_input(tree_state[0].smi),
-                    np.zeros(in_dim))
-                )
+                z_state = np.hstack((embed_input(tree_state[0].smi), np.zeros(in_dim)))
             elif len(tree_state) == 2:
                 z_state = np.hstack(
-                    (embed_input(tree_state[0].smi),
-                    embed_input(tree_state[1].smi))
+                    (embed_input(tree_state[0].smi), embed_input(tree_state[1].smi))
                 )
             else:
                 raise ValueError(f"invalid len(state) of {len(tree_state)}")
@@ -120,8 +116,12 @@ def tree_to_steps(tree, rxn2idx, rct2idx, template_strs, in_dim, out_dim):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv")
-    parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
+    parser.add_argument(
+        "--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv"
+    )
+    parser.add_argument(
+        "--path_templates", type=Path, default="data/templates_cleaned.txt"
+    )
     parser.add_argument("--path_trees", type=Path, default="data/trees_filtered.pickle")
     parser.add_argument("--path_steps", type=Path, default="data/steps.npz")
     parser.add_argument("--path_states", type=Path, default="data/states.npz")
@@ -141,8 +141,8 @@ if __name__ == "__main__":
         return smi_to_bit_fp(smi, radius=args.output_radius, fp_size=args.output_dim)
 
     # load templates
-    with open(args.path_templates, 'r') as f:
-        template_strs = [l.strip().split('|')[1] for l in f.readlines()]
+    with open(args.path_templates, "r") as f:
+        template_strs = [l.strip().split("|")[1] for l in f.readlines()]
 
     # build a helper dict to map template string to template index
     rxn2idx = {}
@@ -159,27 +159,28 @@ if __name__ == "__main__":
         rct2idx[rct_smi] = rct_idx
 
     # load filtered trees
-    with open(args.path_trees, 'rb') as f:
+    with open(args.path_trees, "rb") as f:
         trees = pickle.load(f)
 
     # later we will select specific columns depending on the network to train
-    states_all = [] # we will get our "X" from here
-    steps_all = [] # we will get our "y" from here
+    states_all = []  # we will get our "X" from here
+    steps_all = []  # we will get our "y" from here
 
     error_cnt = 0
     for tree in tqdm(trees):
         try:
-            states, steps = tree_to_steps(tree, rxn2idx, rct2idx, template_strs,
-                                        args.input_dim, args.output_dim)
+            states, steps = tree_to_steps(
+                tree, rxn2idx, rct2idx, template_strs, args.input_dim, args.output_dim
+            )
             states_all.extend(states)
             steps_all.extend(steps)
         except:
             # a few trees have product SMILES that somehow cannot be parsed into Chem.Mol
             # from debugging, seems that they are very complex molecules
             error_cnt += 1
-    print(f'error_cnt: {error_cnt}')
-    print(f'length of states: {len(states_all)}')
-    print(f'length of steps: {len(steps_all)}')
+    print(f"error_cnt: {error_cnt}")
+    print(f"length of states: {len(states_all)}")
+    print(f"length of steps: {len(steps_all)}")
 
     # make into sparse matrix
     # csc matrix for fast column slicing operations
@@ -191,6 +192,6 @@ if __name__ == "__main__":
     (args.path_steps.parent).mkdir(parents=True, exist_ok=True)
 
     sparse.save_npz(args.path_states, states_sparse)
-    print('saved states')
+    print("saved states")
     sparse.save_npz(args.path_steps, steps_sparse)
-    print('saved steps')
+    print("saved steps")

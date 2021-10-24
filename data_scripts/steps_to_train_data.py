@@ -10,7 +10,9 @@ sys.path.append(package_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
+    parser.add_argument(
+        "--path_templates", type=Path, default="data/templates_cleaned.txt"
+    )
     parser.add_argument("--path_steps", type=Path, default="data/steps.npz")
     parser.add_argument("--path_states", type=Path, default="data/states.npz")
     parser.add_argument("--input_dim", type=int, default=4096)
@@ -21,24 +23,24 @@ if __name__ == "__main__":
     OUT_DIM = args.output_dim
 
     # load templates
-    with open(args.path_templates, 'r') as f:
-        template_strs = [l.strip().split('|')[1] for l in f.readlines()]
+    with open(args.path_templates, "r") as f:
+        template_strs = [l.strip().split("|")[1] for l in f.readlines()]
 
     # load the sparse csc matrices
     states = sparse.load_npz(args.path_states)
     steps = sparse.load_npz(args.path_steps)
 
     # prepare output filename prefixes
-    state_prefix = str(args.path_states).replace('.npz', '')
-    step_prefix = str(args.path_steps).replace('.npz', '')
+    state_prefix = str(args.path_states).replace(".npz", "")
+    step_prefix = str(args.path_steps).replace(".npz", "")
 
     ############################################
     # f_act (action selection network)
     # input: z_state + z_target
     # groundtruth: action
 
-    z_state = states[:, :IN_DIM * 2]
-    z_target = states[:, IN_DIM * 2:IN_DIM * 3]
+    z_state = states[:, : IN_DIM * 2]
+    z_target = states[:, IN_DIM * 2 : IN_DIM * 3]
     X = sparse.hstack([z_state, z_target])
 
     # one-hot encoded
@@ -56,11 +58,11 @@ if __name__ == "__main__":
     # input: z_state + z_target
     # groundtruth: a_rt1
 
-    z_state = states[:, :IN_DIM * 2]
-    z_target = states[:, IN_DIM * 2:IN_DIM * 3]
+    z_state = states[:, : IN_DIM * 2]
+    z_target = states[:, IN_DIM * 2 : IN_DIM * 3]
     X = sparse.hstack([z_state, z_target])
 
-    a_rt1 = steps[:, 4:4 + OUT_DIM]
+    a_rt1 = steps[:, 4 : 4 + OUT_DIM]
     rct1_idx = steps[:, -2]
     y = sparse.hstack([a_rt1, rct1_idx])
 
@@ -79,13 +81,13 @@ if __name__ == "__main__":
     # input: z_state + z_target + z_rt1
     # groundtruth: a_rxn
 
-    z_state = states[:, :IN_DIM * 2]
-    z_target = states[:, IN_DIM * 2:IN_DIM * 3]
-    z_rt1 = states[:, IN_DIM * 3:IN_DIM * 4]
+    z_state = states[:, : IN_DIM * 2]
+    z_target = states[:, IN_DIM * 2 : IN_DIM * 3]
+    z_rt1 = states[:, IN_DIM * 3 : IN_DIM * 4]
     X = sparse.hstack([z_state, z_target, z_rt1])
 
     # one-hot encoded
-    a_rxn = steps[:, 4 + OUT_DIM:4 + OUT_DIM + len(template_strs)]
+    a_rxn = steps[:, 4 + OUT_DIM : 4 + OUT_DIM + len(template_strs)]
     y = a_rxn
 
     # remove rows where all(y) == 0 (aka action == 3, END)
@@ -111,7 +113,7 @@ if __name__ == "__main__":
     # X = sparse.hstack([z_state, z_target, z_rt1, z_rxn])
     X = states
 
-    a_rt2 = steps[:, 4 + OUT_DIM + len(template_strs):-2]
+    a_rt2 = steps[:, 4 + OUT_DIM + len(template_strs) : -2]
     rct2_idx = steps[:, -1]
     y = sparse.hstack([a_rt2, rct2_idx])
 

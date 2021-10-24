@@ -10,6 +10,7 @@ from data_scripts.utils import seed_everything
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_trees", type=Path, default="data/trees_filtered.pickle")
     parser.add_argument("--path_train", type=Path, default="data/trees_train.pickle")
@@ -21,11 +22,12 @@ if __name__ == "__main__":
     parser.add_argument("--pct_test", type=float, default=0.2)
     args = parser.parse_args()
 
-    assert args.pct_train + args.pct_val + args.pct_test == 1, \
-        "please ensure args.pct_train/val/test add up to 1"
+    assert (
+        args.pct_train + args.pct_val + args.pct_test == 1
+    ), "please ensure args.pct_train/val/test add up to 1"
 
     # load filtered trees
-    with open(args.path_trees, 'rb') as f:
+    with open(args.path_trees, "rb") as f:
         trees = pickle.load(f)
 
     # seed & shuffle
@@ -34,12 +36,14 @@ if __name__ == "__main__":
 
     # split
     TOTAL = len(trees)
-    trees_train = trees[:int(TOTAL * args.pct_train)]
-    trees_val = trees[int(TOTAL * args.pct_train): int(TOTAL * (args.pct_train + args.pct_val))]
-    trees_test = trees[int(TOTAL * (args.pct_train + args.pct_val)):]
+    trees_train = trees[: int(TOTAL * args.pct_train)]
+    trees_val = trees[
+        int(TOTAL * args.pct_train) : int(TOTAL * (args.pct_train + args.pct_val))
+    ]
+    trees_test = trees[int(TOTAL * (args.pct_train + args.pct_val)) :]
 
     print(f"total: {TOTAL}")
-    print("#"*20, f"initial random shuffle", "#"*20)
+    print("#" * 20, f"initial random shuffle", "#" * 20)
     print(f"num train: {len(trees_train)}")
     print(f"num val: {len(trees_val)}")
     print(f"num test: {len(trees_test)}")
@@ -50,7 +54,9 @@ if __name__ == "__main__":
         for tree in tree_list:
             for mol_node in tree.molecules:
                 smis_seen.add(mol_node.smi)
-    print(f"no. of unique molecules at any part of train + val trees --> {len(smis_seen)}")
+    print(
+        f"no. of unique molecules at any part of train + val trees --> {len(smis_seen)}"
+    )
 
     # the duplicate rate should be ~0.4%
     dup_cnt = 0
@@ -63,7 +69,9 @@ if __name__ == "__main__":
                 trees_val.append(tree)
             else:
                 trees_test_dedup.append(tree)
-    print(f"no. of test trees with final product already seen in a train or val tree --> {dup_cnt}")
+    print(
+        f"no. of test trees with final product already seen in a train or val tree --> {dup_cnt}"
+    )
     if dup_cnt / len(trees_test) > 0.05:
         raise ValueError(
             f"ERROR: too many test trees (>5%) have final product seen in train or val trees. \
@@ -71,20 +79,20 @@ if __name__ == "__main__":
         )
 
     random.shuffle(trees_val)
-    print("#"*20, f"after de-duplication", "#"*20)
+    print("#" * 20, f"after de-duplication", "#" * 20)
     print(f"num train: {len(trees_train)}")
     print(f"num val: {len(trees_val)}")
     print(f"num test: {len(trees_test_dedup)}")
 
     # save
     (args.path_train.parent).mkdir(exist_ok=True, parents=True)
-    with open(args.path_train, 'wb') as f:
+    with open(args.path_train, "wb") as f:
         pickle.dump(trees_train, f)
 
     (args.path_val.parent).mkdir(exist_ok=True, parents=True)
-    with open(args.path_val, 'wb') as f:
+    with open(args.path_val, "wb") as f:
         pickle.dump(trees_val, f)
 
     (args.path_test.parent).mkdir(exist_ok=True, parents=True)
-    with open(args.path_test, 'wb') as f:
+    with open(args.path_test, "wb") as f:
         pickle.dump(trees_test_dedup, f)

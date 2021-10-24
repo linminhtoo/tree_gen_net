@@ -22,12 +22,11 @@ lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
 
-def get_mask_rct2(rxn_idx, rct2_is_second,
-                template_strs, temp_to_rcts, num_rcts):
-    '''
+def get_mask_rct2(rxn_idx, rct2_is_second, template_strs, temp_to_rcts, num_rcts):
+    """
     args
         rct2_is_second : bool, whether second reactant is reactant #2
-    '''
+    """
 
     # collate all possible choices for second reactant
     rct2_idxs = set()
@@ -43,8 +42,9 @@ def get_mask_rct2(rxn_idx, rct2_is_second,
 
     return torch.Tensor(mask_rct2)
 
+
 def get_mask_rxn_and_order(rct1_smi, template_strs, rct_to_temps):
-    '''
+    """
     args
         rct1_smi : SMILES strㅕng of first reactant
 
@@ -62,7 +62,7 @@ def get_mask_rxn_and_order(rct1_smi, template_strs, rct_to_temps):
     NOTE #2:
         attempts to first check if rct1_smi exists in rct_to_temps (only if it is a building block),
         if not, then manually uses RDKit subgraph matching against list of templates
-    '''
+    """
 
     if rct1_smi in rct_to_temps:
         valid_rct1_temps, valid_rct2_temps = rct_to_temps[rct1_smi]
@@ -83,10 +83,11 @@ def get_mask_rxn_and_order(rct1_smi, template_strs, rct_to_temps):
 
     # make the reaction mask
     mask_rxn = [0 for _ in range(len(template_strs))]
-    for i in (valid_rct1_temps | valid_rct2_temps):
+    for i in valid_rct1_temps | valid_rct2_temps:
         mask_rxn[i] = 1
 
     return torch.Tensor(mask_rxn), valid_rct1_temps, valid_rct2_temps
+
 
 def get_mask_reaction_merge(state, template_strs, just_checking=False):
     rct1_mol = Chem.MolFromSmiles(state[0])
@@ -115,6 +116,7 @@ def get_mask_reaction_merge(state, template_strs, just_checking=False):
     else:
         return torch.Tensor(mask_rxn)
 
+
 def get_mask_action(state, template_strs):
     if len(state) == 0:
         mask = [1, 0, 0, 0]
@@ -133,9 +135,8 @@ def get_mask_action(state, template_strs):
 
     return torch.Tensor(mask)
 
-def gen_synth_tree(smis, template_strs,
-                   temp_to_rcts, rct_to_temps,
-                   t_max=10):
+
+def gen_synth_tree(smis, template_strs, temp_to_rcts, rct_to_temps, t_max=10):
 
     tree = SynthesisTree()
     most_recent_mol_smi = None
@@ -151,15 +152,15 @@ def gen_synth_tree(smis, template_strs,
             probs_action_masked = probs_action * mask_action
             action = int(torch.argmax(probs_action_masked).item())
 
-            if action == 3: # END
+            if action == 3:  # END
                 break
 
-            elif action == 0: # ADD
+            elif action == 0:  # ADD
                 # for data generation, just randomly sample
                 # for f_rt1 prediction, do a nearest-neighbour search
                 rct1_smi = random.choice(smis)
 
-            else: # EXPAND or MERGE
+            else:  # EXPAND or MERGE
                 rct1_smi = most_recent_mol_smi
 
             # sample a valid reaction template (that rct1_smi can undergo)
@@ -171,10 +172,10 @@ def gen_synth_tree(smis, template_strs,
                 # if merge, the reaction must fit both sub-tree root molecules
                 # thus, reaction mask has to be specially calculated
                 mask_rxn = get_mask_reaction_merge(state, template_strs)
-            else: # if not merge, reaction just has to fit rct1_smi, we can sample rct2_smi later
-                mask_rxn, rct1_temps, rct2_temps = get_mask_rxn_and_order(rct1_smi,
-                                                                        template_strs,
-                                                                        rct_to_temps)
+            else:  # if not merge, reaction just has to fit rct1_smi, we can sample rct2_smi later
+                mask_rxn, rct1_temps, rct2_temps = get_mask_rxn_and_order(
+                    rct1_smi, template_strs, rct_to_temps
+                )
             probs_rxn_masked = probs_rxn * mask_rxn
             rxn_idx = int(torch.argmax(probs_rxn_masked).item())
             rxn_str = template_strs[rxn_idx]
@@ -195,21 +196,22 @@ def gen_synth_tree(smis, template_strs,
 
             # check num reactants --> uni- or bi-molecular
             if rxn.GetNumReactantTemplates() > 1:
-                if action == 2: # MERGE
+                if action == 2:  # MERGE
                     rct2_smi = set(state) - set([rct1_smi])
-                    rct2_smi = rct2_smi.pop() # get element from set
+                    rct2_smi = rct2_smi.pop()  # get element from set
                     rct2_is_second = True
 
-                else: # ADD or EXPAND
+                else:  # ADD or EXPAND
                     # determine order of rct1 & rct2
-                    if rxn_idx in rct1_temps: # first reactant is reactant #1
-                        rct2_is_second = True # second reactant must be reactant #2
-                    else: # first reactant is reactant #2
-                        rct2_is_second = False # second reactant must be reactant #1
+                    if rxn_idx in rct1_temps:  # first reactant is reactant #1
+                        rct2_is_second = True  # second reactant must be reactant #2
+                    else:  # first reactant is reactant #2
+                        rct2_is_second = False  # second reactant must be reactant #1
 
                     probs_rct2 = torch.rand(len(smis))
-                    mask_rct2 = get_mask_rct2(rxn_idx, rct2_is_second,
-                                            template_strs, temp_to_rcts, len(smis))
+                    mask_rct2 = get_mask_rct2(
+                        rxn_idx, rct2_is_second, template_strs, temp_to_rcts, len(smis)
+                    )
                     if sum(mask_rct2) == 0:
                         # no building block can match as reactant #2 of template
                         break
@@ -223,7 +225,9 @@ def gen_synth_tree(smis, template_strs,
                 rct2_mol = Chem.MolFromSmiles(rct2_smi)
 
                 if rct2_is_second:
-                    prod_mol = rxn.RunReactants((rct1_mol, rct2_mol))[0][0] # output is tuple of tuple
+                    prod_mol = rxn.RunReactants((rct1_mol, rct2_mol))[0][
+                        0
+                    ]  # output is tuple of tuple
                 else:
                     prod_mol = rxn.RunReactants((rct2_mol, rct1_mol))[0][0]
 
@@ -232,14 +236,14 @@ def gen_synth_tree(smis, template_strs,
             else:
                 # run the uni-molecular reaction
                 rct1_mol = Chem.MolFromSmiles(rct1_smi)
-                prod_mol = rxn.RunReactants((rct1_mol, ))[0][0] # [0] # output is tuple of tuple
+                prod_mol = rxn.RunReactants((rct1_mol,))[0][
+                    0
+                ]  # [0] # output is tuple of tuple
                 prod_smi = Chem.MolToSmiles(prod_mol)
                 rct2_smi = None
 
             # update the tree
-            tree.execute_action(
-                action, rxn_str, rct1_smi, rct2_smi, prod_smi
-            )
+            tree.execute_action(action, rxn_str, rct1_smi, rct2_smi, prod_smi)
             most_recent_mol_smi = prod_smi
     except Exception as e:
         # something wrong happened
@@ -254,9 +258,7 @@ def gen_synth_tree(smis, template_strs,
 
     if action == 3:
         tree.execute_action(
-            3,
-            template_str=None, rct1_smi=None, rct2_smi=None,
-            prod_smi=None
+            3, template_str=None, rct1_smi=None, rct2_smi=None, prod_smi=None
         )
         return tree
     else:
@@ -264,20 +266,30 @@ def gen_synth_tree(smis, template_strs,
         # print('error')
         return None
 
+
 def gen_one_tree(i, t_max=10):
-    tree = gen_synth_tree(smis, template_strs,
-               temp_to_rcts, rct_to_temps,
-               t_max)
+    tree = gen_synth_tree(smis, template_strs, temp_to_rcts, rct_to_temps, t_max)
     return tree
+
 
 if __name__ == "__main__":
     from functools import partial
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks_cleaned.csv")
-    parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
-    parser.add_argument("--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle")
-    parser.add_argument("--path_temp_to_rcts", type=Path, default="data/temp_to_rcts_cleaned.pickle")
+    parser.add_argument(
+        "--path_csv_matched_rcts",
+        type=Path,
+        default="data/matched_building_blocks_cleaned.csv",
+    )
+    parser.add_argument(
+        "--path_templates", type=Path, default="data/templates_cleaned.txt"
+    )
+    parser.add_argument(
+        "--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle"
+    )
+    parser.add_argument(
+        "--path_temp_to_rcts", type=Path, default="data/temp_to_rcts_cleaned.pickle"
+    )
     parser.add_argument("--path_trees", type=Path, default="data/trees.pickle")
     parser.add_argument("--num_trees", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=1337)
@@ -291,14 +303,14 @@ if __name__ == "__main__":
     smis = df_matched.SMILES.tolist()
 
     # load templates
-    with open(args.path_templates, 'r') as f:
-        template_strs = [l.strip().split('|')[1] for l in f.readlines()]
+    with open(args.path_templates, "r") as f:
+        template_strs = [l.strip().split("|")[1] for l in f.readlines()]
 
     # NOTE: this has limited utility, once we start making new molecules, this dict cannot be used
-    with open(args.path_rct_to_temps, 'rb') as f:
+    with open(args.path_rct_to_temps, "rb") as f:
         rct_to_temps = pickle.load(f)
 
-    with open(args.path_temp_to_rcts, 'rb') as f:
+    with open(args.path_temp_to_rcts, "rb") as f:
         temp_to_rcts = pickle.load(f)
 
     p = Pool(args.ncpu)
@@ -311,16 +323,15 @@ if __name__ == "__main__":
 
     cnt_success, cnt_fail = 0, 0
     for tree in tqdm(
-            p.imap(gen_one_tree_, range(NUM_TREES), chunksize=1),
-            total=NUM_TREES
-        ):
+        p.imap(gen_one_tree_, range(NUM_TREES), chunksize=1), total=NUM_TREES
+    ):
         if tree:
             cnt_success += 1
             trees.append(tree)
 
             if cnt_success > 0 and cnt_success % args.checkpoint_every == 0:
                 # checkpoint trees
-                with open(args.path_trees, 'wb') as f:
+                with open(args.path_trees, "wb") as f:
                     pickle.dump(trees, f)
 
         else:
@@ -333,5 +344,5 @@ if __name__ == "__main__":
     # num fail: 4291
 
     # save trees
-    with open(args.path_trees, 'wb') as f:
+    with open(args.path_trees, "wb") as f:
         pickle.dump(trees, f)

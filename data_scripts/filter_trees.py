@@ -13,16 +13,19 @@ from data_scripts.utils import seed_everything
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_trees", type=Path, default="data/trees.pickle")
-    parser.add_argument("--path_trees_filtered", type=Path, default="data/trees_filtered.pickle")
+    parser.add_argument(
+        "--path_trees_filtered", type=Path, default="data/trees_filtered.pickle"
+    )
     parser.add_argument("--seed", type=int, default=1337)
     args = parser.parse_args()
 
-    with open(args.path_trees, 'rb') as f:
+    with open(args.path_trees, "rb") as f:
         trees = pickle.load(f)
 
-    qed = Oracle(name='QED')
+    qed = Oracle(name="QED")
     # https://github.com/mims-harvard/TDC/blob/main/tutorials/TDC_105_Oracle.ipynb
 
     trees_keep = []
@@ -39,8 +42,8 @@ if __name__ == "__main__":
         elif random.random() < qed_val / 0.5:
             trees_keep.append(tree)
 
-    print(f'num trees original: {len(trees)}')
-    print(f'num trees kept: {len(trees_keep)}')
+    print(f"num trees original: {len(trees)}")
+    print(f"num trees kept: {len(trees_keep)}")
 
-    with open(args.path_trees_filtered, 'wb') as f:
+    with open(args.path_trees_filtered, "wb") as f:
         pickle.dump(trees_keep, f)

@@ -7,7 +7,8 @@ from collections import deque
 
 import multiprocessing
 from multiprocessing import Pool
-multiprocessing.set_start_method('spawn', force=True)
+
+multiprocessing.set_start_method("spawn", force=True)
 
 from pathlib import Path
 
@@ -46,11 +47,11 @@ def crossover(parents, num_offsprings=512, mean=2048, std=410):
     offsprings = []
     for i in range(num_offsprings):
         # initialise offspring vector of zeros
-        offspring = np.zeros(fp_size, dtype='int32')
+        offspring = np.zeros(fp_size, dtype="int32")
 
         # indices to inherit from parent_a vs parent_b
-        bit_idxs_from_a = bit_idxs[i, :num_bits_a[i]]
-        bit_idxs_from_b = bit_idxs[i, num_bits_a[i]:]
+        bit_idxs_from_a = bit_idxs[i, : num_bits_a[i]]
+        bit_idxs_from_b = bit_idxs[i, num_bits_a[i] :]
 
         # inherit accordingly
         offspring[bit_idxs_from_a] = parents[parent_idxs[i, 0], bit_idxs_from_a]
@@ -59,6 +60,7 @@ def crossover(parents, num_offsprings=512, mean=2048, std=410):
         offsprings.append(offspring)
 
     return np.array(offsprings)
+
 
 def mutate(offsprings, num_bits=24, p=0.5):
     num_offsprings, fp_size = offsprings.shape
@@ -78,6 +80,7 @@ def mutate(offsprings, num_bits=24, p=0.5):
 
     return np.array(offsprings_out)
 
+
 def get_oracle(property):
     # we can also define custom oracles with complex combinations of different scores
     # they just need to have __call__(self, smi) method
@@ -86,41 +89,56 @@ def get_oracle(property):
         # Glycogen synthase kinase 3 beta, also known as GSK3β, is an enzyme that in humans is encoded by the GSK3β gene
         # Abnormal regulation and expression of GSK3β is associated with an increased susceptibility towards bipolar disorder
         # The oracle is a random forest classifer using ECFP6 fingerprints using ExCAPE-DB dataset.
-        oracle = Oracle(name = "GSK3B")
+        oracle = Oracle(name="GSK3B")
 
     elif property == "JNK3":
         # DRD2 stands for dopamine type 2 receptor
         # The oracle is constructed by Olivercrona et al., using a support vector machine classifier
         # with a Gaussian kernel with ECFP6 fingerprint on ExCAPE-DB dataset.
-        oracle = Oracle(name = "JNK3")
+        oracle = Oracle(name="JNK3")
 
     elif property == "SA":
         # how hard or how easy it is to synthesize a given molecule,
         # based on a combination of the molecule’s fragments contributions.
         # The oracle is caluated via RDKit, using a set of chemical rules defined by Ertl et al.
-        oracle = Oracle(name = "SA")
+        oracle = Oracle(name="SA")
 
     else:
         raise ValueError(f"unrecognized property to optimize: {property}")
 
     return oracle
 
+
 parser = argparse.ArgumentParser()
 # inputs
-parser.add_argument("--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv")
+parser.add_argument(
+    "--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv"
+)
 parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
-parser.add_argument("--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle")
-parser.add_argument("--path_temp_to_rcts", type=Path, default="data/temp_to_rcts_cleaned.pickle")
+parser.add_argument(
+    "--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle"
+)
+parser.add_argument(
+    "--path_temp_to_rcts", type=Path, default="data/temp_to_rcts_cleaned.pickle"
+)
 parser.add_argument("--path_fps", type=Path, default="data/rct_fps.npz")
 parser.add_argument("--path_index", type=Path, default="data/knn_rct_fps.index")
 parser.add_argument("--path_model_config", type=Path, default="config/models.yaml")
 parser.add_argument("--path_seed_smis", type=Path, default="data/ZINC_smi_seeds.txt")
-parser.add_argument("--path_seed_trees", type=Path) # default="data/checkpoints/genetic_algorithm/seed_trees.pickle"
+parser.add_argument(
+    "--path_seed_trees", type=Path
+)  # default="data/checkpoints/genetic_algorithm/seed_trees.pickle"
 # outputs
-parser.add_argument("--path_save_ckpt_dir", type=Path, default="checkpoints/genetic_algorithm/")
+parser.add_argument(
+    "--path_save_ckpt_dir", type=Path, default="checkpoints/genetic_algorithm/"
+)
 # genetic algorithm parameters
-parser.add_argument("--property", type=str, default="GSK3B",
-                help="oracle function to score generated molecules, ['GSK3B', 'JNK3', 'SA']")
+parser.add_argument(
+    "--property",
+    type=str,
+    default="GSK3B",
+    help="oracle function to score generated molecules, ['GSK3B', 'JNK3', 'SA']",
+)
 parser.add_argument("--num_offsprings", type=int, default=512)
 parser.add_argument("--num_parents", type=int, default=128)
 parser.add_argument("--generations", type=int, default=200)
@@ -152,14 +170,14 @@ df_matched = pd.read_csv(args.path_csv_matched_rcts)
 smis = df_matched.SMILES.tolist()
 
 # load templates
-with open(args.path_templates, 'r') as f:
-    template_strs = [l.strip().split('|')[1] for l in f.readlines()]
+with open(args.path_templates, "r") as f:
+    template_strs = [l.strip().split("|")[1] for l in f.readlines()]
 
 # NOTE: this has limited utility, once we start making new molecules, this dict cannot be used
-with open(args.path_rct_to_temps, 'rb') as f:
+with open(args.path_rct_to_temps, "rb") as f:
     rct_to_temps = pickle.load(f)
 
-with open(args.path_temp_to_rcts, 'rb') as f:
+with open(args.path_temp_to_rcts, "rb") as f:
     temp_to_rcts = pickle.load(f)
 
 # load building block embeddings (fingerprints)
@@ -167,7 +185,7 @@ mol_fps = sparse.load_npz(args.path_fps)
 mol_fps = mol_fps.toarray()
 
 # load building block kNN search index
-index_all_mols = nmslib.init(method='hnsw', space='cosinesimil')
+index_all_mols = nmslib.init(method="hnsw", space="cosinesimil")
 index_all_mols.loadIndex(str(args.path_index), load_data=True)
 
 with open(args.path_model_config, "r") as stream:
@@ -183,38 +201,58 @@ print(f"finished loading 4 models from checkpoints")
 
 # from genetic_algorithm_helper import decode_smi_or_z
 def decode_smi_or_z(smi_or_z):
-    '''
+    """
     as this function needs the 4 models loaded on GPU, ensure the models have been loaded globally
-    '''
+    """
     if isinstance(smi_or_z, str):
         tree = decode_synth_tree(
-                    f_act=f_act, f_rt1=f_rt1, f_rt2=f_rt2, f_rxn=f_rxn,
-                    target_smi=smi_or_z, target_z=None,
-                    mol_fps=mol_fps, smis=smis, index_all_mols=index_all_mols,
-                    template_strs=template_strs, temp_to_rcts=temp_to_rcts, rct_to_temps=rct_to_temps,
-                    input_dim=model_config['input_fp_dim'], radius=model_config['radius'],
-                    t_max=args.max_steps
-                )
+            f_act=f_act,
+            f_rt1=f_rt1,
+            f_rt2=f_rt2,
+            f_rxn=f_rxn,
+            target_smi=smi_or_z,
+            target_z=None,
+            mol_fps=mol_fps,
+            smis=smis,
+            index_all_mols=index_all_mols,
+            template_strs=template_strs,
+            temp_to_rcts=temp_to_rcts,
+            rct_to_temps=rct_to_temps,
+            input_dim=model_config["input_fp_dim"],
+            radius=model_config["radius"],
+            t_max=args.max_steps,
+        )
     else:
         tree = decode_synth_tree(
-                    f_act=f_act, f_rt1=f_rt1, f_rt2=f_rt2, f_rxn=f_rxn,
-                    target_smi=None, target_z=smi_or_z,
-                    mol_fps=mol_fps, smis=smis, index_all_mols=index_all_mols,
-                    template_strs=template_strs, temp_to_rcts=temp_to_rcts, rct_to_temps=rct_to_temps,
-                    input_dim=model_config['input_fp_dim'], radius=model_config['radius'],
-                    t_max=args.max_steps
-                )
+            f_act=f_act,
+            f_rt1=f_rt1,
+            f_rt2=f_rt2,
+            f_rxn=f_rxn,
+            target_smi=None,
+            target_z=smi_or_z,
+            mol_fps=mol_fps,
+            smis=smis,
+            index_all_mols=index_all_mols,
+            template_strs=template_strs,
+            temp_to_rcts=temp_to_rcts,
+            rct_to_temps=rct_to_temps,
+            input_dim=model_config["input_fp_dim"],
+            radius=model_config["radius"],
+            t_max=args.max_steps,
+        )
     return tree
+
 
 def optimize(args, p):
     ########### PREPARE THE SEEDS ###########
     # load starting seed SMILES
-    with open(args.path_seed_smis, 'r') as f:
+    with open(args.path_seed_smis, "r") as f:
         seed_smis = [l.strip() for l in f.readlines()]
-    assert len(seed_smis) >= args.num_parents, \
-        f"number of seed SMILES: {len(seed_smis)} less than --num_parents {args.num_parents}"
+    assert (
+        len(seed_smis) >= args.num_parents
+    ), f"number of seed SMILES: {len(seed_smis)} less than --num_parents {args.num_parents}"
     if len(seed_smis) > args.num_parents:
-        seed_smis = seed_smis[:args.num_parents]
+        seed_smis = seed_smis[: args.num_parents]
 
     # get oracle function
     oracle = get_oracle(args.property)
@@ -222,21 +260,21 @@ def optimize(args, p):
     # score seed SMILES against desired property
     seed_scores = []
     for s in tqdm(
-            p.imap(oracle, seed_smis),
-            total=len(seed_smis), desc="scoring seed SMILES"
-        ):
+        p.imap(oracle, seed_smis), total=len(seed_smis), desc="scoring seed SMILES"
+    ):
         seed_scores.append(s)
     seed_scores = np.array(seed_scores)
 
     # decode with seed SMILES as targets
     if args.path_seed_trees is None:
-        print('decoding with seed SMILES as target_smi')
+        print("decoding with seed SMILES as target_smi")
         seed_trees = []
         cnt_success, cnt_fail = 0, 0
         for tree in tqdm(
-                p.imap(decode_smi_or_z, seed_smis),
-                total=len(seed_smis), desc="decoding seed SMILES"
-            ):
+            p.imap(decode_smi_or_z, seed_smis),
+            total=len(seed_smis),
+            desc="decoding seed SMILES",
+        ):
             if tree:
                 cnt_success += 1
                 seed_trees.append(tree)
@@ -246,40 +284,50 @@ def optimize(args, p):
         print(f"num success: {cnt_success} ({cnt_success / len(seed_smis) * 100:.2f}%)")
         print(f"num fail: {cnt_fail} ({cnt_fail / len(seed_smis) * 100:.2f}%)")
 
-        with open(args.path_save_ckpt_dir / "seed_trees.pickle", 'wb') as f:
+        with open(args.path_save_ckpt_dir / "seed_trees.pickle", "wb") as f:
             pickle.dump(seed_trees, f)
     else:
-        print('loading trees decoded from seed SMILES as target_smi')
-        with open(args.path_seed_trees, 'rb') as f:
+        print("loading trees decoded from seed SMILES as target_smi")
+        with open(args.path_seed_trees, "rb") as f:
             seed_trees = pickle.load(f)
 
     # score decoded SMILES against desired property
     seed_decoded_smis = [tree.molecules[-1].smi for tree in seed_trees]
     seed_decoded_scores = []
     for score in tqdm(
-            p.imap(oracle, seed_decoded_smis),
-            total=len(seed_decoded_smis), desc="scoring SMILES decoded from seeds"
-        ):
+        p.imap(oracle, seed_decoded_smis),
+        total=len(seed_decoded_smis),
+        desc="scoring SMILES decoded from seeds",
+    ):
         seed_decoded_scores.append(score)
     seed_decoded_scores = np.array(seed_decoded_scores)
 
-    print(f"average score of seed SMILES: {seed_scores.mean():.4f} (+-{seed_scores.std():.4f})")
-    print(f"average score of SMILES decoded from seeds: {seed_decoded_scores.mean():.4f} (+-{seed_decoded_scores.std():.4f})")
+    print(
+        f"average score of seed SMILES: {seed_scores.mean():.4f} (+-{seed_scores.std():.4f})"
+    )
+    print(
+        f"average score of SMILES decoded from seeds: {seed_decoded_scores.mean():.4f} (+-{seed_decoded_scores.std():.4f})"
+    )
 
     ########### RUN THE GENETIC ALGORITHM ###########
     # encode seeds into fingerprints
-    seed_fps = [smi_to_bit_fp(smi, radius=args.radius, fp_size=args.fp_size) for smi in seed_smis]
+    seed_fps = [
+        smi_to_bit_fp(smi, radius=args.radius, fp_size=args.fp_size)
+        for smi in seed_smis
+    ]
     parents = np.array(seed_fps)
 
     # crossover --> mutate --> score, until stopping criteria
     score_history = deque(maxlen=args.early_stop_patience)
     for gen_idx in tqdm(range(args.generations), desc="running genetic algorithm"):
-        print('#'*50)
-        print(f'generation {gen_idx}')
+        print("#" * 50)
+        print(f"generation {gen_idx}")
 
         offsprings = crossover(
-            parents, num_offsprings=args.num_offsprings,
-            mean=args.cross_mean, std=args.cross_std
+            parents,
+            num_offsprings=args.num_offsprings,
+            mean=args.cross_mean,
+            std=args.cross_std,
         )
 
         offsprings = mutate(offsprings, num_bits=args.mutate_bits, p=args.mutate_prob)
@@ -288,27 +336,31 @@ def optimize(args, p):
         decoded_trees = []
         cnt_success, cnt_fail = 0, 0
         for tree in tqdm(
-                p.imap(decode_smi_or_z, offsprings),
-                total=len(offsprings), desc="decoding offsprings"
-            ):
+            p.imap(decode_smi_or_z, offsprings),
+            total=len(offsprings),
+            desc="decoding offsprings",
+        ):
             if tree:
                 cnt_success += 1
                 decoded_trees.append(tree)
             else:
                 cnt_fail += 1
         print(f"num targets: {len(offsprings)}")
-        print(f"num success: {cnt_success} ({cnt_success / len(offsprings) * 100:.2f}%)")
+        print(
+            f"num success: {cnt_success} ({cnt_success / len(offsprings) * 100:.2f}%)"
+        )
         print(f"num fail: {cnt_fail} ({cnt_fail / len(offsprings) * 100:.2f}%)")
 
         # score decoded SMILES against desired property
         decoded_smis = [tree.molecules[-1].smi for tree in decoded_trees]
         decoded_scores = []
         for score in tqdm(
-                p.imap(oracle, decoded_smis),
-                total=len(decoded_smis), desc="scoring decoded SMILES"
-            ):
+            p.imap(oracle, decoded_smis),
+            total=len(decoded_smis),
+            desc="scoring decoded SMILES",
+        ):
             decoded_scores.append(score)
-        mean_decoded_score = sum(decoded_scores)/len(decoded_scores)
+        mean_decoded_score = sum(decoded_scores) / len(decoded_scores)
         print(f"average score of all decoded SMILES: {mean_decoded_score:.4f}")
 
         # select the best molecules (SMILES) as parents for next generation
@@ -320,39 +372,50 @@ def optimize(args, p):
         decoded_trees = np.array(decoded_trees)[idxs_desc]
 
         parents = np.array(
-            [smi_to_bit_fp(smi, radius=args.radius, fp_size=args.fp_size) \
-                for smi in decoded_smis[:args.num_parents]]
+            [
+                smi_to_bit_fp(smi, radius=args.radius, fp_size=args.fp_size)
+                for smi in decoded_smis[: args.num_parents]
+            ]
         )
-        print(f"average score of top-{args.num_parents} decoded SMILES: {decoded_scores[:args.num_parents].mean():.4f}")
+        print(
+            f"average score of top-{args.num_parents} decoded SMILES: {decoded_scores[:args.num_parents].mean():.4f}"
+        )
         print(f"average score of top-1 decoded SMILES: {decoded_scores[0]:.4f}")
-        print(f"average score of top-10 decoded SMILES: {decoded_scores[:10].mean():.4f}")
+        print(
+            f"average score of top-10 decoded SMILES: {decoded_scores[:10].mean():.4f}"
+        )
 
         if args.save_every_gen:
             # checkpoint
-            with open(args.path_save_ckpt_dir / f"trees_{gen_idx}.pickle", 'wb') as f:
+            with open(args.path_save_ckpt_dir / f"trees_{gen_idx}.pickle", "wb") as f:
                 pickle.dump(decoded_trees.tolist(), f)
-            with open(args.path_save_ckpt_dir / f"{gen_idx}_smis.txt", 'w') as f:
-                f.write('\n'.join(decoded_smis.astype(str)))
-            with open(args.path_save_ckpt_dir / f"{gen_idx}_scores.txt", 'w') as f:
-                f.write('\n'.join(decoded_scores.astype(str)))
+            with open(args.path_save_ckpt_dir / f"{gen_idx}_smis.txt", "w") as f:
+                f.write("\n".join(decoded_smis.astype(str)))
+            with open(args.path_save_ckpt_dir / f"{gen_idx}_scores.txt", "w") as f:
+                f.write("\n".join(decoded_scores.astype(str)))
             np.savez(str(args.path_save_ckpt_dir / f"{gen_idx}_fps.npz"), a=offsprings)
 
         # decide whether to early stop
         score_history.appendleft(mean_decoded_score)
-        if len(score_history) == args.early_stop_patience: # num elapsed generations >= early_stop_patience
+        if (
+            len(score_history) == args.early_stop_patience
+        ):  # num elapsed generations >= early_stop_patience
             if score_history[-1] - score_history[0] < args.early_stop_delta:
-                print(f"early stopping because rise in scores: {score_history[-1] - score_history[0]:.4f}")
+                print(
+                    f"early stopping because rise in scores: {score_history[-1] - score_history[0]:.4f}"
+                )
                 print(f"less than --early_stop_delta: {args.early_stop_delta:.4f}")
                 break
 
     # save outputs from final generation for metric evaluation
-    with open(args.path_save_ckpt_dir / "trees_final.pickle", 'wb') as f:
+    with open(args.path_save_ckpt_dir / "trees_final.pickle", "wb") as f:
         pickle.dump(decoded_trees.tolist(), f)
-    with open(args.path_save_ckpt_dir / "smis_final.txt", 'w') as f:
-        f.write('\n'.join(decoded_smis.astype(str)))
-    with open(args.path_save_ckpt_dir / "scores_final.txt", 'w') as f:
-        f.write('\n'.join(decoded_scores.astype(str)))
+    with open(args.path_save_ckpt_dir / "smis_final.txt", "w") as f:
+        f.write("\n".join(decoded_smis.astype(str)))
+    with open(args.path_save_ckpt_dir / "scores_final.txt", "w") as f:
+        f.write("\n".join(decoded_scores.astype(str)))
     np.savez(str(args.path_save_ckpt_dir / "fps_final.npz"), a=offsprings)
+
 
 if __name__ == "__main__":
     # pool must be guarded by __main__

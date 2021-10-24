@@ -10,10 +10,8 @@ from scipy import sparse
 package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(package_dir)
 
-def create_knn_index(
-        data,
-        metric="cosinesimil", method="hnsw"
-    ):
+
+def create_knn_index(data, metric="cosinesimil", method="hnsw"):
     index = nmslib.init(method=method, space=metric)
     index.addDataPointBatch(data)
     index.createIndex(
@@ -25,6 +23,7 @@ def create_knn_index(
         }
     )
     return index
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
