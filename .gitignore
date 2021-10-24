@@ -1,5 +1,9 @@
 data/*
 !data/enamine_us.csv
+!data/ZINC_urls.txt
+!data/ZINC_smis_seeds.txt
+
+oracle/*
 
 checkpoints/*
 

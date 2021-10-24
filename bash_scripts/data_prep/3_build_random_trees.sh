@@ -5,7 +5,7 @@ conda activate tree
 # TODO: how to choose --max_steps
 # 32 cores definitely faster than 8 cores
 # suffix="maxstep15_num600k", seed 2021
-trees="maxstep15_num300k"
+suffix="maxstep15_num300k"
 python3 data_scripts/build_random_trees.py \
     --path_templates "data/templates_cleaned.txt" \
     --path_rct_to_temps "data/rct_to_temps_cleaned.pickle" \
