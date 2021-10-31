@@ -4,7 +4,6 @@ conda activate tree
 # expt_name="maxstep10_num100k_64p_256o_100g_01d_10s"
 expt_name="maxstep10_num100k_128p_512o_100g_01d_10s_multi"
 
-# last test whether torch.multiprocessing can solve it
 # NOTE: --path_seed_trees can only be provided after running at least once
 CUDA_VISIBLE_DEVICES=0 python3 genetic_algorithm_multiprocess.py \
     --path_save_ckpt_dir "checkpoints/genetic_algorithm/${expt_name}/" \

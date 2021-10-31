@@ -32,12 +32,9 @@ all credits goes to the authors
 Gao, Wenhao, Rocío Mercado, and Connor W. Coley. "Amortized Tree Generation for Bottom-up Synthesis Planning and Synthesizable Molecular Design." arXiv preprint arXiv:2110.06389 (2021).
 ```
 
-# TODOs
-- confirmatory computations
-    - genetic algorithm full 100 generations
-    - analogue generation on best molecules from genetic algorithm --> evaluate property also
-- potential next steps
-    - future experiments
-        - experimental validation
-        - filtering training trees by property of interest (property-biased neural networks)
-    - unit tests
+# potential next steps
+- future experiments
+    - experimental validation
+    - filtering training trees by property of interest (property-biased neural networks)
+    - analogue generation on best molecules from genetic algorithm, hope the analogues also have high property of interest
+- unit tests
