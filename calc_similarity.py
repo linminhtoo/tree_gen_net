@@ -95,16 +95,12 @@ if __name__ == "__main__":
         f"average tanimoto similarity (including failed decoding): {simils.mean():.4f} (+-{simils.std():.4f})"
     )
     exact = sum(simils == 1) / len(simils)
-    print(
-        f"exact match (including failed decoding): {exact * 100:.2f}"
-    )
+    print(f"exact match (including failed decoding): {exact * 100:.2f}")
 
     success_idxs = np.array(decoded_smis) != None
     simils = simils[success_idxs]
     exact = sum(simils == 1) / len(simils)
-    print(
-        f"exact match (excluding failed decoding): {exact * 100:.2f}"
-    )
+    print(f"exact match (excluding failed decoding): {exact * 100:.2f}")
     print(
         f"average tanimoto similarity (excluding failed decoding): {simils.mean():.4f} (+-{simils.std():.4f})"
     )

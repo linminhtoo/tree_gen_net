@@ -114,7 +114,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv"
     )
-    parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
+    parser.add_argument(
+        "--path_templates", type=Path, default="data/templates_cleaned.txt"
+    )
     parser.add_argument(
         "--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle"
     )
@@ -124,7 +126,9 @@ if __name__ == "__main__":
     parser.add_argument("--path_fps", type=Path, default="data/rct_fps.npz")
     parser.add_argument("--path_index", type=Path, default="data/knn_rct_fps.index")
     parser.add_argument("--path_model_config", type=Path, default="config/models.yaml")
-    parser.add_argument("--path_seed_smis", type=Path, default="data/ZINC_smi_seeds.txt")
+    parser.add_argument(
+        "--path_seed_smis", type=Path, default="data/ZINC_smi_seeds.txt"
+    )
     parser.add_argument(
         "--path_seed_trees", type=Path
     )  # default="data/checkpoints/genetic_algorithm/seed_trees.pickle"
@@ -249,10 +253,7 @@ if __name__ == "__main__":
 
     # score seed SMILES against desired property
     seed_scores = []
-    for seed_smi in tqdm(
-            seed_smis,
-            desc="scoring seed SMILES"
-        ):
+    for seed_smi in tqdm(seed_smis, desc="scoring seed SMILES"):
         s = oracle(seed_smi)
         seed_scores.append(s)
     seed_scores = np.array(seed_scores)
@@ -263,9 +264,9 @@ if __name__ == "__main__":
         seed_trees = []
         cnt_success, cnt_fail = 0, 0
         for seed_smi in tqdm(
-                seed_smis,
-                desc="decoding seed SMILES",
-            ):
+            seed_smis,
+            desc="decoding seed SMILES",
+        ):
             tree = decode_smi_or_z(seed_smi, f_act, f_rt1, f_rt2, f_rxn)
             if tree:
                 cnt_success += 1
@@ -288,9 +289,9 @@ if __name__ == "__main__":
     seed_decoded_scores = []
 
     for seed_decoded_smi in tqdm(
-            seed_decoded_smis,
-            desc="scoring SMILES decoded from seeds",
-        ):
+        seed_decoded_smis,
+        desc="scoring SMILES decoded from seeds",
+    ):
         score = oracle(seed_decoded_smi)
         seed_decoded_scores.append(score)
     seed_decoded_scores = np.array(seed_decoded_scores)
@@ -332,9 +333,9 @@ if __name__ == "__main__":
         decoded_trees = []
         cnt_success, cnt_fail = 0, 0
         for offspring in tqdm(
-                offsprings,
-                desc="decoding offsprings",
-            ):
+            offsprings,
+            desc="decoding offsprings",
+        ):
             tree = decode_smi_or_z(offspring, f_act, f_rt1, f_rt2, f_rxn)
             if tree:
                 cnt_success += 1
@@ -351,9 +352,9 @@ if __name__ == "__main__":
         decoded_smis = [tree.molecules[-1].smi for tree in decoded_trees]
         decoded_scores = []
         for decoded_smi in tqdm(
-                decoded_smis,
-                desc="scoring decoded SMILES",
-            ):
+            decoded_smis,
+            desc="scoring decoded SMILES",
+        ):
             score = oracle(decoded_smi)
             decoded_scores.append(score)
         mean_decoded_score = sum(decoded_scores) / len(decoded_scores)

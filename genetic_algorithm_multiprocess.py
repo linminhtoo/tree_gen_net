@@ -204,6 +204,7 @@ f_rt2.share_memory()
 f_rxn.share_memory()
 print(f"finished loading 4 models from checkpoints")
 
+
 def decode_smi_or_z(smi_or_z):
     """
     as this function needs the 4 models loaded on GPU, ensure the models have been loaded globally
@@ -245,6 +246,7 @@ def decode_smi_or_z(smi_or_z):
             t_max=args.max_steps,
         )
     return tree
+
 
 if __name__ == "__main__":
     # pool must be guarded by __main__
@@ -348,17 +350,16 @@ if __name__ == "__main__":
         cnt_success, cnt_fail = 0, 0
         with Pool(args.ncpu) as p:
             for tree in tqdm(
-                p.imap(decode_smi_or_z, offsprings,
-                        chunksize=1), # multi process
+                p.imap(decode_smi_or_z, offsprings, chunksize=1),  # multi process
                 total=len(offsprings),
                 desc="decoding offsprings",
             ):
-            # purely single process
-            # for offspring in tqdm(
-            #     offsprings,
-            #     total=len(offsprings),
-            #     desc="decoding offsprings",
-            # ):
+                # purely single process
+                # for offspring in tqdm(
+                #     offsprings,
+                #     total=len(offsprings),
+                #     desc="decoding offsprings",
+                # ):
                 # tree = decode_smi_or_z(offspring)
                 if tree:
                     cnt_success += 1
