@@ -14,7 +14,7 @@ class BasicFeedforward(nn.Module):
     hidden_sizes : List[int]
         list of hidden layer sizes for the encoder, from layer 0 onwards
         e.g. [1024, 512, 256] = layer 0 has 1024 neurons, layer 1 has 512 neurons etc.
-    output_size : List[int]
+    output_size : int
         how many outputs the model should give
     """
 
