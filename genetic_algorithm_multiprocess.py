@@ -1,10 +1,16 @@
 import argparse
 import gc
+import logging
+import torch.multiprocessing as multiprocessing
 import os
 import pickle
 import random
 import sys
 from collections import deque
+from torch.multiprocessing import Pool
+
+multiprocessing.set_start_method("spawn", force=True)
+
 from pathlib import Path
 
 import nmslib
@@ -108,131 +114,140 @@ def get_oracle(property):
     return oracle
 
 
+parser = argparse.ArgumentParser()
+# inputs
+parser.add_argument(
+    "--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv"
+)
+parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
+parser.add_argument(
+    "--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle"
+)
+parser.add_argument(
+    "--path_temp_to_rcts", type=Path, default="data/temp_to_rcts_cleaned.pickle"
+)
+parser.add_argument("--path_fps", type=Path, default="data/rct_fps.npz")
+parser.add_argument("--path_index", type=Path, default="data/knn_rct_fps.index")
+parser.add_argument("--path_model_config", type=Path, default="config/models.yaml")
+parser.add_argument("--path_seed_smis", type=Path, default="data/ZINC_smi_seeds.txt")
+parser.add_argument(
+    "--path_seed_trees", type=Path
+)  # default="data/checkpoints/genetic_algorithm/seed_trees.pickle"
+# outputs
+parser.add_argument(
+    "--path_save_ckpt_dir", type=Path, default="checkpoints/genetic_algorithm/"
+)
+# genetic algorithm parameters
+parser.add_argument(
+    "--property",
+    type=str,
+    default="GSK3B",
+    help="oracle function to score generated molecules, ['GSK3B', 'JNK3', 'SA']",
+)
+parser.add_argument("--num_offsprings", type=int, default=512)
+parser.add_argument("--num_parents", type=int, default=128)
+parser.add_argument("--generations", type=int, default=200)
+parser.add_argument("--early_stop_delta", type=float, default=0.01)
+parser.add_argument("--early_stop_patience", type=int, default=10)
+parser.add_argument("--cross_mean", type=int, default=2048)
+parser.add_argument("--cross_std", type=int, default=410)
+parser.add_argument("--mutate_bits", type=int, default=24)
+parser.add_argument("--mutate_prob", type=float, default=0.5)
+parser.add_argument("--save_every_gen", action="store_true")
+# decoding parameters
+parser.add_argument("--radius", type=int, default=2)
+parser.add_argument("--fp_size", type=int, default=4096)
+parser.add_argument("--max_steps", type=int, default=10)
+# misc args
+parser.add_argument("--ncpu", type=int, default=24)
+parser.add_argument("--random_seed", type=int, default=1337)
+args = parser.parse_args()
+
+print(args)
+
+(args.path_save_ckpt_dir).mkdir(parents=True, exist_ok=True)
+
+seed_everything(args.random_seed)
+
+########### LOAD ALL INPUTS ###########
+# load valid building blocks
+df_matched = pd.read_csv(args.path_csv_matched_rcts)
+smis = df_matched.SMILES.tolist()
+
+# load templates
+with open(args.path_templates, "r") as f:
+    template_strs = [l.strip().split("|")[1] for l in f.readlines()]
+
+# NOTE: this has limited utility, once we start making new molecules, this dict cannot be used
+with open(args.path_rct_to_temps, "rb") as f:
+    rct_to_temps = pickle.load(f)
+
+with open(args.path_temp_to_rcts, "rb") as f:
+    temp_to_rcts = pickle.load(f)
+
+# load building block embeddings (fingerprints)
+mol_fps = sparse.load_npz(args.path_fps)
+mol_fps = mol_fps.toarray()
+
+# load building block kNN search index
+index_all_mols = nmslib.init(method="hnsw", space="cosinesimil")
+index_all_mols.loadIndex(str(args.path_index), load_data=True)
+
+with open(args.path_model_config, "r") as stream:
+    model_config = yaml.safe_load(stream)
+
+# load 4 trained models from checkpoints
+f_act, f_rt1, f_rt2, f_rxn = load_models(model_config)
+f_act.share_memory()
+f_rt1.share_memory()
+f_rt2.share_memory()
+f_rxn.share_memory()
+print(f"finished loading 4 models from checkpoints")
+
+def decode_smi_or_z(smi_or_z):
+    """
+    as this function needs the 4 models loaded on GPU, ensure the models have been loaded globally
+    """
+    if isinstance(smi_or_z, str):
+        tree = decode_synth_tree(
+            f_act=f_act,
+            f_rt1=f_rt1,
+            f_rt2=f_rt2,
+            f_rxn=f_rxn,
+            target_smi=smi_or_z,
+            target_z=None,
+            mol_fps=mol_fps,
+            smis=smis,
+            index_all_mols=index_all_mols,
+            template_strs=template_strs,
+            temp_to_rcts=temp_to_rcts,
+            rct_to_temps=rct_to_temps,
+            input_dim=model_config["input_fp_dim"],
+            radius=model_config["radius"],
+            t_max=args.max_steps,
+        )
+    else:
+        tree = decode_synth_tree(
+            f_act=f_act,
+            f_rt1=f_rt1,
+            f_rt2=f_rt2,
+            f_rxn=f_rxn,
+            target_smi=None,
+            target_z=smi_or_z,
+            mol_fps=mol_fps,
+            smis=smis,
+            index_all_mols=index_all_mols,
+            template_strs=template_strs,
+            temp_to_rcts=temp_to_rcts,
+            rct_to_temps=rct_to_temps,
+            input_dim=model_config["input_fp_dim"],
+            radius=model_config["radius"],
+            t_max=args.max_steps,
+        )
+    return tree
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    # inputs
-    parser.add_argument(
-        "--path_csv_matched_rcts", type=Path, default="data/matched_building_blocks.csv"
-    )
-    parser.add_argument("--path_templates", type=Path, default="data/templates_cleaned.txt")
-    parser.add_argument(
-        "--path_rct_to_temps", type=Path, default="data/rct_to_temps_cleaned.pickle"
-    )
-    parser.add_argument(
-        "--path_temp_to_rcts", type=Path, default="data/temp_to_rcts_cleaned.pickle"
-    )
-    parser.add_argument("--path_fps", type=Path, default="data/rct_fps.npz")
-    parser.add_argument("--path_index", type=Path, default="data/knn_rct_fps.index")
-    parser.add_argument("--path_model_config", type=Path, default="config/models.yaml")
-    parser.add_argument("--path_seed_smis", type=Path, default="data/ZINC_smi_seeds.txt")
-    parser.add_argument(
-        "--path_seed_trees", type=Path
-    )  # default="data/checkpoints/genetic_algorithm/seed_trees.pickle"
-    # outputs
-    parser.add_argument(
-        "--path_save_ckpt_dir", type=Path, default="checkpoints/genetic_algorithm/"
-    )
-    # genetic algorithm parameters
-    parser.add_argument(
-        "--property",
-        type=str,
-        default="GSK3B",
-        help="oracle function to score generated molecules, ['GSK3B', 'JNK3', 'SA']",
-    )
-    parser.add_argument("--num_offsprings", type=int, default=512)
-    parser.add_argument("--num_parents", type=int, default=128)
-    parser.add_argument("--generations", type=int, default=200)
-    parser.add_argument("--early_stop_delta", type=float, default=0.01)
-    parser.add_argument("--early_stop_patience", type=int, default=10)
-    parser.add_argument("--cross_mean", type=int, default=2048)
-    parser.add_argument("--cross_std", type=int, default=410)
-    parser.add_argument("--mutate_bits", type=int, default=24)
-    parser.add_argument("--mutate_prob", type=float, default=0.5)
-    parser.add_argument("--save_every_gen", action="store_true")
-    # decoding parameters
-    parser.add_argument("--radius", type=int, default=2)
-    parser.add_argument("--fp_size", type=int, default=4096)
-    parser.add_argument("--max_steps", type=int, default=10)
-    # misc args
-    parser.add_argument("--ncpu", type=int, default=24)
-    parser.add_argument("--random_seed", type=int, default=1337)
-    args = parser.parse_args()
-
-    print(args)
-
-    (args.path_save_ckpt_dir).mkdir(parents=True, exist_ok=True)
-
-    seed_everything(args.random_seed)
-
-    ########### LOAD ALL INPUTS ###########
-    # load valid building blocks
-    df_matched = pd.read_csv(args.path_csv_matched_rcts)
-    smis = df_matched.SMILES.tolist()
-
-    # load templates
-    with open(args.path_templates, "r") as f:
-        template_strs = [l.strip().split("|")[1] for l in f.readlines()]
-
-    # NOTE: this has limited utility, once we start making new molecules, this dict cannot be used
-    with open(args.path_rct_to_temps, "rb") as f:
-        rct_to_temps = pickle.load(f)
-
-    with open(args.path_temp_to_rcts, "rb") as f:
-        temp_to_rcts = pickle.load(f)
-
-    # load building block embeddings (fingerprints)
-    mol_fps = sparse.load_npz(args.path_fps)
-    mol_fps = mol_fps.toarray()
-
-    # load building block kNN search index
-    index_all_mols = nmslib.init(method="hnsw", space="cosinesimil")
-    index_all_mols.loadIndex(str(args.path_index), load_data=True)
-
-    with open(args.path_model_config, "r") as stream:
-        model_config = yaml.safe_load(stream)
-
-    # load 4 trained models from checkpoints
-    f_act, f_rt1, f_rt2, f_rxn = load_models(model_config)
-    print(f"finished loading 4 models from checkpoints")
-
-    def decode_smi_or_z(smi_or_z, f_act, f_rt1, f_rt2, f_rxn):
-        if isinstance(smi_or_z, str):
-            tree = decode_synth_tree(
-                f_act=f_act,
-                f_rt1=f_rt1,
-                f_rt2=f_rt2,
-                f_rxn=f_rxn,
-                target_smi=smi_or_z,
-                target_z=None,
-                mol_fps=mol_fps,
-                smis=smis,
-                index_all_mols=index_all_mols,
-                template_strs=template_strs,
-                temp_to_rcts=temp_to_rcts,
-                rct_to_temps=rct_to_temps,
-                input_dim=model_config["input_fp_dim"],
-                radius=model_config["radius"],
-                t_max=args.max_steps,
-            )
-        else:
-            tree = decode_synth_tree(
-                f_act=f_act,
-                f_rt1=f_rt1,
-                f_rt2=f_rt2,
-                f_rxn=f_rxn,
-                target_smi=None,
-                target_z=smi_or_z,
-                mol_fps=mol_fps,
-                smis=smis,
-                index_all_mols=index_all_mols,
-                template_strs=template_strs,
-                temp_to_rcts=temp_to_rcts,
-                rct_to_temps=rct_to_temps,
-                input_dim=model_config["input_fp_dim"],
-                radius=model_config["radius"],
-                t_max=args.max_steps,
-            )
-        return tree
+    # pool must be guarded by __main__
 
     ########### PREPARE THE SEEDS ###########
     # load starting seed SMILES
@@ -248,30 +263,30 @@ if __name__ == "__main__":
     oracle = get_oracle(args.property)
 
     # score seed SMILES against desired property
-    seed_scores = []
-    for seed_smi in tqdm(
-            seed_smis,
-            desc="scoring seed SMILES"
+    with Pool(args.ncpu) as p:
+        seed_scores = []
+        for s in tqdm(
+            p.imap(oracle, seed_smis), total=len(seed_smis), desc="scoring seed SMILES"
         ):
-        s = oracle(seed_smi)
-        seed_scores.append(s)
-    seed_scores = np.array(seed_scores)
+            seed_scores.append(s)
+        seed_scores = np.array(seed_scores)
 
     # decode with seed SMILES as targets
     if args.path_seed_trees is None:
         print("decoding with seed SMILES as target_smi")
         seed_trees = []
         cnt_success, cnt_fail = 0, 0
-        for seed_smi in tqdm(
-                seed_smis,
+        with Pool(args.ncpu) as p:
+            for tree in tqdm(
+                p.imap(decode_smi_or_z, seed_smis),
+                total=len(seed_smis),
                 desc="decoding seed SMILES",
             ):
-            tree = decode_smi_or_z(seed_smi, f_act, f_rt1, f_rt2, f_rxn)
-            if tree:
-                cnt_success += 1
-                seed_trees.append(tree)
-            else:
-                cnt_fail += 1
+                if tree:
+                    cnt_success += 1
+                    seed_trees.append(tree)
+                else:
+                    cnt_fail += 1
         print(f"num targets: {len(seed_smis)}")
         print(f"num success: {cnt_success} ({cnt_success / len(seed_smis) * 100:.2f}%)")
         print(f"num fail: {cnt_fail} ({cnt_fail / len(seed_smis) * 100:.2f}%)")
@@ -286,14 +301,14 @@ if __name__ == "__main__":
     # score decoded SMILES against desired property
     seed_decoded_smis = [tree.molecules[-1].smi for tree in seed_trees]
     seed_decoded_scores = []
-
-    for seed_decoded_smi in tqdm(
-            seed_decoded_smis,
+    with Pool(args.ncpu) as p:
+        for score in tqdm(
+            p.imap(oracle, seed_decoded_smis),
+            total=len(seed_decoded_smis),
             desc="scoring SMILES decoded from seeds",
         ):
-        score = oracle(seed_decoded_smi)
-        seed_decoded_scores.append(score)
-    seed_decoded_scores = np.array(seed_decoded_scores)
+            seed_decoded_scores.append(score)
+        seed_decoded_scores = np.array(seed_decoded_scores)
 
     print(
         f"average score of seed SMILES: {seed_scores.mean():.4f} (+-{seed_scores.std():.4f})"
@@ -331,16 +346,25 @@ if __name__ == "__main__":
         # run the decoding on single process
         decoded_trees = []
         cnt_success, cnt_fail = 0, 0
-        for offspring in tqdm(
-                offsprings,
+        with Pool(args.ncpu) as p:
+            for tree in tqdm(
+                p.imap(decode_smi_or_z, offsprings,
+                        chunksize=1), # multi process
+                total=len(offsprings),
                 desc="decoding offsprings",
             ):
-            tree = decode_smi_or_z(offspring, f_act, f_rt1, f_rt2, f_rxn)
-            if tree:
-                cnt_success += 1
-                decoded_trees.append(tree)
-            else:
-                cnt_fail += 1
+            # purely single process
+            # for offspring in tqdm(
+            #     offsprings,
+            #     total=len(offsprings),
+            #     desc="decoding offsprings",
+            # ):
+                # tree = decode_smi_or_z(offspring)
+                if tree:
+                    cnt_success += 1
+                    decoded_trees.append(tree)
+                else:
+                    cnt_fail += 1
         print(f"num targets: {len(offsprings)}")
         print(
             f"num success: {cnt_success} ({cnt_success / len(offsprings) * 100:.2f}%)"
@@ -350,12 +374,13 @@ if __name__ == "__main__":
         # score decoded SMILES against desired property
         decoded_smis = [tree.molecules[-1].smi for tree in decoded_trees]
         decoded_scores = []
-        for decoded_smi in tqdm(
-                decoded_smis,
+        with Pool(args.ncpu) as p:
+            for score in tqdm(
+                p.imap(oracle, decoded_smis),
+                total=len(decoded_smis),
                 desc="scoring decoded SMILES",
             ):
-            score = oracle(decoded_smi)
-            decoded_scores.append(score)
+                decoded_scores.append(score)
         mean_decoded_score = sum(decoded_scores) / len(decoded_scores)
         print(f"average score of all decoded SMILES: {mean_decoded_score:.4f}")
 
@@ -402,10 +427,6 @@ if __name__ == "__main__":
                 )
                 print(f"less than --early_stop_delta: {args.early_stop_delta:.4f}")
                 break
-
-        # reload 4 trained models from checkpoints
-        f_act, f_rt1, f_rt2, f_rxn = load_models(model_config)
-        print(f"finished loading 4 models from checkpoints")
 
     # save outputs from final generation for metric evaluation
     with open(args.path_save_ckpt_dir / "trees_final.pickle", "wb") as f:

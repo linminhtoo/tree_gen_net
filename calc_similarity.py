@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # load decoded trees & get decoded SMILES
     with open(args.path_decoded_trees, "rb") as f:
         trees_decoded = pickle.load(f)
-    decoded_smis = [tree.molecules[-1].smi for tree in trees_decoded]
+    decoded_smis = [tree.molecules[-1].smi if tree else None for tree in trees_decoded]
 
     # assert len(decoded_smis) == len(target_smis)
 
@@ -94,9 +94,17 @@ if __name__ == "__main__":
     print(
         f"average tanimoto similarity (including failed decoding): {simils.mean():.4f} (+-{simils.std():.4f})"
     )
+    exact = sum(simils == 1) / len(simils)
+    print(
+        f"exact match (including failed decoding): {exact * 100:.2f}"
+    )
 
-    success_idxs = decoded_smis != None
+    success_idxs = np.array(decoded_smis) != None
     simils = simils[success_idxs]
+    exact = sum(simils == 1) / len(simils)
+    print(
+        f"exact match (excluding failed decoding): {exact * 100:.2f}"
+    )
     print(
         f"average tanimoto similarity (excluding failed decoding): {simils.mean():.4f} (+-{simils.std():.4f})"
     )

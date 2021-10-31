@@ -108,7 +108,7 @@ f_rxn.share_memory()
 print(f"finished loading 4 models from checkpoints")
 
 
-def decode_one_tree(target_smi):
+def decode_one_smi(target_smi):
     tree = decode_synth_tree(
         f_act=f_act,
         f_rt1=f_rt1,
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     # run the decoding, multiprocess
     trees = []
     cnt_success, cnt_fail = 0, 0
-    for tree in tqdm(p.imap(decode_one_tree, target_smis), total=len(target_smis)):
+    for tree in tqdm(p.imap(decode_one_smi, target_smis), total=len(target_smis)):
         if tree:
             cnt_success += 1
             trees.append(tree)

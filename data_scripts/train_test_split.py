@@ -58,7 +58,7 @@ if __name__ == "__main__":
         f"no. of unique molecules at any part of train + val trees --> {len(smis_seen)}"
     )
 
-    # the duplicate rate should be ~0.4%
+    # the duplicate rate should be ~0.4%, NOTE: ideally should canonicalize to check, but shouldn't be significant
     dup_cnt = 0
     trees_test_dedup = []
     for tree in trees_test:

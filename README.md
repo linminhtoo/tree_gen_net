@@ -33,6 +33,11 @@ Gao, Wenhao, Rocío Mercado, and Connor W. Coley. "Amortized Tree Generation for
 ```
 
 # TODOs
+- confirmatory computations
+    - genetic algorithm full 100 generations
+    - analogue generation on best molecules from genetic algorithm --> evaluate property also
 - potential next steps
-    - some research ideas
+    - future experiments
+        - experimental validation
+        - filtering training trees by property of interest (property-biased neural networks)
     - unit tests
