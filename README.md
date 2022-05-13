@@ -1,3 +1,6 @@
+# (Reimplementation) Amortized Tree Generation for Bottom-up Synthesis Planning and Synthesizable Molecular Design 
+https://openreview.net/forum?id=FRxhHdnxt1 
+
 # setup (conda environment)
 ```
 # init conda, such as by activating .bashrc
